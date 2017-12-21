@@ -43,3 +43,4 @@ if __name__ == '__main__':
     print (pred)
     print (yo)
     print ( np.sum(pred == yo)/5000 )
+    check_gradient()
