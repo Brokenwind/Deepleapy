@@ -1,0 +1,11 @@
+This is handwritten digits dataset, and it contains the following datas:
+
+  Data for training model
+  X:    (400,5000)  5000 handwritten digits, each picture is 20 * 20
+  y:    (5000,)     the values are in the range [0-9], each item means the correct number in the picture
+
+  The trained parameters with sigmoid activition
+  W1:   (25,400)    
+  W1:   (10,25)
+  b1:   (25,1)
+  b2:   (10,1)

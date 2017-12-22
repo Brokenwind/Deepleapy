@@ -1,0 +1,6 @@
+This dataset contains following datas:
+  X:         (209, 64, 64, 3)    209 pictures for trainning a cat recognizer
+  y:         (209,)              whether the picture is a cat, 0: not cat; 1: cat
+  Xtest:     (50, 64, 64, 3)     50 pictures for testing the cat recognizer
+  ytest:     (50,)               whether the picture is a cat, 0: not cat; 1: cat
+  classes:   (2,)                array(['non-cat', 'cat'])
