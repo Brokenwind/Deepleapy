@@ -51,6 +51,7 @@ class DataMap:
     def class2matrix(self,data):
         """
         convert a list of classes to matrix expression
+        It is used when class number bigger than 2
         """
         idx = self.class2index(data)
         res = self.index2matrix(idx)
@@ -58,22 +59,34 @@ class DataMap:
 
     def matrix2class(self,matrix):
         """
-        convert a matrix expression to its original classes
+        convert a matrix expression to a list of classes
+        It is used when class number bigger than 2
         """
         idx = self.matrix2index(matrix)
         return self.index2class(idx)
 
     def matrix2index(self,matrix):
-        idx = np.argmax(matrix,axis=0)
-        idx += self.offset
-        idx = idx.astype(int)
+        """
+        convert a matrix expression to a list of indexes
+        It is used when class number bigger than 2
+        """
+        if matrix.shape[0] == 1 :
+            idx = self.binary_classify(matrix)
+        else:
+            idx = np.argmax(matrix,axis=0)
+            idx += self.offset
+            idx = idx.astype(int)
 
         return idx
 
     def index2matrix(self,idx):
         """
-        use vector to express each y[i]
+        convert a list of indexes to its matrix expression
+        It is used when class number bigger than 2
         """
+        if self.class_num == 2:
+            return idx
+
         num = np.size(idx)
         idx = idx - self.offset
         idx = idx.astype(int)
@@ -83,6 +96,13 @@ class DataMap:
             res[:,i] = eye[:,idx[i]]
 
         return res
+
+    def binary_classify(self,data):
+        data[data >= 0.5] = 1
+        data[data < 0.5] = 0
+        data = data.astype(int)
+
+        return data
 
 if __name__ == '__main__':
     map = DataMap(['one','two','three','four'],offset=1)
