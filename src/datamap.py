@@ -60,7 +60,7 @@ class DataMap:
         """
         convert a matrix expression to its original classes
         """
-        idx = matrix2index(matrix)
+        idx = self.matrix2index(matrix)
         return self.index2class(idx)
 
     def matrix2index(self,matrix):

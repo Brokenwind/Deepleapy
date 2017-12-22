@@ -5,7 +5,7 @@ import numpy as np
 import numpy.linalg as linalg
 import scipy.optimize as op
 from activation import *
-from prepro import *
+from datamap import *
 
 def compute_cost(params,hyperparams,x,y):
     """
@@ -73,12 +73,7 @@ def predict(params, hyperparams, x, y):
     thetas: it is a list of classifier params of each level.
     """
     res,_ = forward(params, hyperparams, x, y)
-    # col index of the max probality of each col
-    pos = np.argmax(res,axis=0)
-    # predicted values of each row of X
-    pred = pos + 1
-
-    return pred
+    return res
 
 
 def backward(params,hyperparams,X, y):
@@ -208,6 +203,7 @@ def check_gradient(hyperparams=None, test_num = 5):
     class_num = units[L-1]
     # the number of features of input data
     feature_num = units[0]
+    map = DataMap(range(0,class_num))
 
     params = {}
     for i in np.arange(1,L):
@@ -220,8 +216,8 @@ def check_gradient(hyperparams=None, test_num = 5):
     # Reusing debug_init_paramsializeWeights to generate X
     x,_ = debug_init_params( test_num, feature_num )
     # generate corresponding y
-    y = 1 + np.mod(np.arange(1,test_num+1),class_num)
-    y = expandY(y,class_num)
+    y = np.mod(np.arange(1,test_num+1),class_num)
+    y = map.class2matrix(y)
     # calculate the gradient with two diffent ways
     grad1 = backward(params,hyperparams,x,y)
     grad2 = numerical_gradient(params,hyperparams,x,y)
