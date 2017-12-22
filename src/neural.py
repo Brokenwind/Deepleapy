@@ -15,6 +15,12 @@ def compute_cost(params,hyperparams,x,y):
     reg: if it is True, means using regularized logistic. Default False
     lamda: it is used when reg=True
     """
+
+    # the regularition parameter
+    units = hyperparams['units']
+    lamd = hyperparams['lamda']
+    L = len(units)
+
     yh,cache = forward(params, hyperparams, x, y)
     # n: the number of class
     # m: the number row of result
@@ -26,16 +32,15 @@ def compute_cost(params,hyperparams,x,y):
     #And you can compare it with the function compute_cost in ex2/optimlog.py
     all = y * np.log(yh) + (1 - y) * np.log(1-yh)
     J = -np.nansum(all)/m
-    """
-    if  isinstance(params,np.ndarray):
-        params = reshapeList(params,units)
-        for theta in params:
-            # the first col of theta is not involed in calculation
-            zero = np.zeros((np.size(theta,0),1))
-            theta = np.hstack((zero,theta[:,1:]))
-            theta = theta.flatten()
-            J += lamda/(2.0*m)*(np.sum(theta * theta))
-    """
+
+    regular = 0
+    for l in range(1,L):
+        W = params['W' + str(l)]
+        b = params['b' + str(l)]
+        regular += np.sum(W * W)
+
+    J += lamd/(2.0*m)*regular
+
     return J
 
 def forward(params, hyperparams, X, y):
@@ -101,6 +106,7 @@ def backward(params,hyperparams,X, y):
     units = hyperparams['units']
     # activition function
     activition = hyperparams['activition']
+    lamd = hyperparams['lamda']
     L = len(units)
     gradients = {}
 
@@ -125,6 +131,8 @@ def backward(params,hyperparams,X, y):
 
             dW = 1./m * np.dot(dZ, A.T)
             db = 1./m * np.sum(dZ, axis=1, keepdims = True)
+        # add regularition item
+        dW += 1.0*lamd/m * params['W'+str(l)]
 
         gradients['dZ'+str(l)] = dZ
         gradients['dW'+str(l)] = dW
@@ -206,6 +214,7 @@ def check_gradient(hyperparams=None, test_num = 5):
         units = [4,5,3]
         hyperparams['units'] = units
     hyperparams['activition'] = 'sigmoid'
+    hyperparams['lamda'] = 1
 
     L = len(units)
     # the number of ouput classifications
