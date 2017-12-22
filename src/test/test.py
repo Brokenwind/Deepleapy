@@ -33,6 +33,7 @@ if __name__ == '__main__':
     hyperparams = {}
     units = [400, 25, 10]
     hyperparams['units'] = units
+    hyperparams['activition'] = 'sigmoid'
     hyperparams['lamda'] = 0.1
 
     cost = compute_cost(params,hyperparams,X,Y)
@@ -42,9 +43,7 @@ if __name__ == '__main__':
     y1 = map.matrix2index(Y1)
     y0 = map.matrix2index(Y)
 
-    print (y0[0:100])
-    print (y1[0:100])
-
-    print ( np.sum(y1 == y0)/5000 )
+    accuracy = np.sum(y1 == y0)/5000.0
+    print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
 
     check_gradient()

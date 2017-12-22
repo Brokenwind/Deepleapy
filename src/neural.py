@@ -11,7 +11,7 @@ def compute_cost(params,hyperparams,x,y):
     """
     x: the input test data
     y: the label of relative x
-    thetas: a list of all levels of estimated  value of unknown parameter
+    params: a list of all levels of estimated  value of unknown parameter
     reg: if it is True, means using regularized logistic. Default False
     lamda: it is used when reg=True
     """
@@ -27,9 +27,9 @@ def compute_cost(params,hyperparams,x,y):
     all = y * np.log(yh) + (1 - y) * np.log(1-yh)
     J = -np.nansum(all)/m
     """
-    if  isinstance(thetas,np.ndarray):
-        thetas = reshapeList(thetas,units)
-        for theta in thetas:
+    if  isinstance(params,np.ndarray):
+        params = reshapeList(params,units)
+        for theta in params:
             # the first col of theta is not involed in calculation
             zero = np.zeros((np.size(theta,0),1))
             theta = np.hstack((zero,theta[:,1:]))
@@ -39,14 +39,16 @@ def compute_cost(params,hyperparams,x,y):
     return J
 
 def forward(params, hyperparams, X, y):
-    """forward(thetas,x,y)
-    x: the input of test data
+    """forward(params, hyperparams, X, y)
+    Y: the input of test data
     y: the output of test data
-    thetas: it is a list of classifier params of each level.
+    params: it is a list of classifier params of each level.
 
     Return: the  final result a and all middle value z
     """
     units = hyperparams['units']
+    # activition function
+    activition = hyperparams['activition']
     L = len(units)
     cache={}
     # LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SIGMOID
@@ -57,8 +59,11 @@ def forward(params, hyperparams, X, y):
         b = params['b' + str(l)]
         Z = np.dot(W, A) + b
         if l != L - 1:
-            A = relu(Z)
-            #A = sigmoid(Z)
+            if activition == 'relu':
+                A = relu(Z)
+            else:
+                A = sigmoid(Z)
+        # the last layer is using sigmoid to do classification
         else:
             A = sigmoid(Z)
         cache['Z'+str(l)] = Z
@@ -67,10 +72,10 @@ def forward(params, hyperparams, X, y):
     return A, cache
 
 def predict(params, hyperparams, x, y):
-    """predict(thetas,x,y)
+    """predict(params,x,y)
     x: the input of test data
     y: the output of test data
-    thetas: it is a list of classifier params of each level.
+    params: it is a list of classifier params of each level.
     """
     res,_ = forward(params, hyperparams, x, y)
     return res
@@ -94,6 +99,8 @@ def backward(params,hyperparams,X, y):
     m = X.shape[1]
 
     units = hyperparams['units']
+    # activition function
+    activition = hyperparams['activition']
     L = len(units)
     gradients = {}
 
@@ -109,12 +116,13 @@ def backward(params,hyperparams,X, y):
             Wp = params['W'+str(l+1)]
             # use calculated dZ in previous layer
             dA = np.dot(Wp.T, dZ)
-            # np.int64(A > 0) is the gradient of ReLU
-            dZ = dA * np.int64(Z > 0)
-            """
-            gz = sigmoid(Z)
-            dZ = dA * gz * (1-gz)
-            """
+            if activition == 'relu':
+                # np.int64(A > 0) is the gradient of ReLU
+                dZ = dA * np.int64(Z > 0)
+            else:
+                gZ = sigmoid(Z)
+                dZ = dA * gZ * (1-gZ)
+
             dW = 1./m * np.dot(dZ, A.T)
             db = 1./m * np.sum(dZ, axis=1, keepdims = True)
 
@@ -197,6 +205,7 @@ def check_gradient(hyperparams=None, test_num = 5):
         # default number units of each layer
         units = [4,5,3]
         hyperparams['units'] = units
+    hyperparams['activition'] = 'sigmoid'
 
     L = len(units)
     # the number of ouput classifications
@@ -231,7 +240,7 @@ def check_gradient(hyperparams=None, test_num = 5):
         fdW1 = np.hstack((fdW1,W1.flatten()))
         fdW2 = np.hstack((fdW2,W2.flatten()))
     diffW = linalg.norm(fdW1 - fdW2)/linalg.norm(fdW1 + fdW2)
-    print ("Evaluate the norm of the difference between two W: %e" % (diffW))
+    print ("Evaluate the norm of the difference between two dW: %e" % (diffW))
 
     # calculate the norm of the difference of two kinds of b
     fdb1 = np.array([])
@@ -242,7 +251,7 @@ def check_gradient(hyperparams=None, test_num = 5):
         fdb1 = np.hstack((fdb1,b1.flatten()))
         fdb2 = np.hstack((fdb2,b2.flatten()))
     diffb = linalg.norm(fdb1 - fdb2)/linalg.norm(fdb1 + fdb2)
-    print ("Evaluate the norm of the difference between two b: %e" % (diffb))
+    print ("Evaluate the norm of the difference between two db: %e" % (diffb))
 
     res = ( diffW < deadline ) and ( diffb < deadline )
     if ( res ):
