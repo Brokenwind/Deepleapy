@@ -6,6 +6,7 @@ import numpy.linalg as linalg
 import scipy.optimize as op
 from activation import *
 from datamap import *
+from prodata import *
 
 def compute_cost(params,hyperparams,X,y):
     """
@@ -141,6 +142,24 @@ def backward(params,hyperparams,X, y):
     return gradients
 
 
+def gradient_descent(hyperparams,X,y):
+    units = hyperparams['units']
+    L = len(units)
+    # the number of iterations
+    iters = hyperparams['iters']
+    alpha = hyperparams['alpha']
+
+    params = init_params(units)
+    while iters > 0 :
+        grads = backward(params,hyperparams,X,y)
+        # update parameters with calculated gradients
+        for l in range(1,L):
+            params['W' + str(l)] -= alpha * grads['dW' + str(l)]
+            params['b' + str(l)] -= alpha * grads['db' + str(l)]
+        iters -= 1
+
+    return params
+
 def numerical_gradient(params,hyperparams,X,y):
     check = 1e-4
     units = hyperparams['units']
@@ -181,24 +200,6 @@ def numerical_gradient(params,hyperparams,X,y):
 
     return grads
 
-def debug_init_params(lin,lout):
-    """
-    Initialize the weights of a layer with lin incoming connections and 
-    lout outgoing connections using a fixed strategy, 
-    this will help you later in debugging
-
-    """
-    lin += 1
-    """
-    Initialize theta using "sin", this ensures that W is always of the same
-    values and will be useful for debugging
-    """
-    theta = np.sin(np.arange(1,lin*lout+1))/10.0
-    theta = theta.reshape((lout,lin))
-    b = theta[:,0]
-    b = b.reshape((b.size),1)
-    W = np.delete(theta,0,axis=1)
-    return W,b
 
 def check_gradient(hyperparams=None, test_num = 5):
 
