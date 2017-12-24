@@ -1,11 +1,12 @@
 import numpy as np
+import re
+from numpy.linalg import norm
 
-def debug_init_params(lin,lout):
+def debug_init_unit(lin,lout):
     """
     Initialize the weights of a layer with lin incoming connections and 
     lout outgoing connections using a fixed strategy, 
     this will help you later in debugging
-
     """
     lin += 1
     """
@@ -18,6 +19,28 @@ def debug_init_params(lin,lout):
     b = b.reshape((b.size),1)
     W = np.delete(theta,0,axis=1)
     return W,b
+
+def debug_init_params(units):
+    """
+    Initialize the parameters with fixed values for debugging
+
+    Arguments:
+    units -- python array (list) containing the dimensions of each layer in our network
+
+    Returns:
+    parameters -- python dictionary containing your parameters "W1", "b1", ..., "WL", "bL":
+        Wl -- weight matrix of shape (layer_dims[l], layer_dims[l-1])
+        bl -- bias vector of shape (layer_dims[l], 1)
+    """
+    params = {}
+    for i in np.arange(1,len(units)):
+        lin = units[i-1]
+        lout = units[i]
+        W,b = debug_init_unit(lin,lout)
+        params['W'+str(i)] = W
+        params['b'+str(i)] = b
+
+    return params
 
 def init_params(units):
     """
@@ -48,15 +71,58 @@ def init_params(units):
 
     return params
 
-def normalize(x):
+def normalize(x,axis=0):
     """
     returns a normalized version of X where the mean value of each feature is 0 and the standard deviation is 1. This is often a good preprocessing step to do when working with learning algorithms.
     """
-    #if ( not isinstance(mean,np.ndarray) ) or ( not isinstance(mean,np.ndarray)):
-    mean = np.mean(x,1)
-    mean = mean.reshape((mean.size,1))
-    std = np.std(x,1)
-    std = std.reshape((std.size,1))
+    mean = np.mean(x,axis)
+    std = np.std(x,axis)
+
+    if axis == 1:
+        mean = mean.reshape((mean.size,1))
+        std = std.reshape((std.size,1))
+    else:
+        mean = mean.reshape((1,mean.size))
+        std = std.reshape((1,std.size))
+
     norm = (x - mean)/std
 
     return norm,mean,std
+
+def extract(params,prefix):
+    """
+    extract values from a dict when the key has the same given prefix
+    """
+    pattern = re.compile(prefix)
+    keys = params.keys()
+
+    sels = []
+    for key in keys:
+        if pattern.match(key):
+            sels.append(key)
+    sels.sort()
+
+    res = {}
+    for key in sels:
+        res[key] = params[key]
+
+    return res
+
+def normdiff(dict1, dict2, prefix=None):
+    """
+    calculate the norm of the difference of two dataset
+    """
+    if prefix != None:
+        dict1 = extract(dict1,prefix)
+        dict2 = extract(dict2,prefix)
+
+    flat1 = np.array([])
+    flat2 = np.array([])
+
+    for key in dict1.keys():
+        flat1 = np.hstack((flat1,dict1[key].flatten()))
+        flat2 = np.hstack((flat2,dict2[key].flatten()))
+
+    diff = norm(flat1 - flat2)/norm(flat1 + flat2)
+
+    return diff
