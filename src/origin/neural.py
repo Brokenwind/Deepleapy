@@ -7,6 +7,7 @@ import scipy.optimize as op
 from activation import *
 from datamap import *
 from prodata import *
+from loss import LOSS_FUNCTIONS
 
 def compute_cost(params,hyperparams,X,y):
     """
@@ -16,23 +17,21 @@ def compute_cost(params,hyperparams,X,y):
     reg: if it is True, means using regularized logistic. Default False
     lamda: it is used when reg=True
     """
-
     # the regularition parameter
     units = hyperparams['units']
     lamd = hyperparams['lamda']
+    loss = hyperparams['lossfunc']
+
     L = len(units)
 
     yh,cache = forward(params, hyperparams, X, y)
     # n: the number of class
     # m: the number row of result
     n,m = yh.shape
-    # vectorize the real value and predicted result
-    y = y.flatten()
-    yh = yh.flatten()
-    #the computation of cost function of each y(i)  is simmilar to the logistic regression cost function.
-    #And you can compare it with the function compute_cost in ex2/optimlog.py
-    all = y * np.log(yh) + (1 - y) * np.log(1-yh)
-    J = -np.nansum(all)/m
+
+    lossfunc = LOSS_FUNCTIONS[loss]
+
+    J = lossfunc(y,yh,axis=1)
 
     regular = 0
     for l in range(1,L):
@@ -160,53 +159,75 @@ def gradient_descent(hyperparams,X,y):
 
     return params
 
-def numerical_gradient(params,hyperparams,X,y):
+def numerical_gradient_part(params,hyperparams,X,y,prefix):
+    """
+    compute numerical gradient of parameter specified with prefix
+    """
     check = 1e-4
+    grads={}
     units = hyperparams['units']
-    L = len(units)
-    grads = {}
+    for l in range(1,len(units)):
+        value = params[prefix+str(l)]
+        m,n = value.shape
+        dTmp = np.zeros((m,n))
+        for i in range(0,m):
+            for j in range(0,n):
+                tmp = value[i,j]
+                value[i,j] = tmp + check
+                up = compute_cost(params,hyperparams,X,y)
+                value[i,j] = tmp - check
+                down = compute_cost(params,hyperparams,X,y)
+                dTmp[i,j] = (up - down)/(2.0*check)
+                value[i,j] = tmp
 
+        grads['d'+prefix+str(l)] = dTmp
+
+    return grads
+
+def numerical_gradient(params,hyperparams,X,y):
+    """
+    Compute all the numerical gradients of parameters in cost function
+    Arguments:
+    params -- python dictionary containing your parameters "W1", "b1", "W2", "b2", "W3", "b3":
+    hyperparams -- python dictionary containing your hyperparameters
+
+    X -- input datapoint, of shape (input size, 1)
+    y -- true "label"
+
+    Returns:
+    grads -- numerical gradients of the cost function
+
+    """
     # compute numerical gradient of parameter W
-    for l in range(1,L):
-        W = params['W'+str(l)]
-        m,n = W.shape
-        dW = np.zeros((m,n))
-        for i in range(0,m):
-            for j in range(0,n):
-                tmp = W[i,j]
-                W[i,j] = tmp + check
-                up = compute_cost(params,hyperparams,X,y)
-                W[i,j] = tmp - check
-                down = compute_cost(params,hyperparams,X,y)
-                dW[i,j] = (up - down)/(2.0*check)
-                W[i,j] = tmp
-        grads['dW'+str(l)] = dW
-
+    gradW = numerical_gradient_part(params,hyperparams,X,y,'W')
     # compute numerical gradient of parameter b
-    for l in range(1,L):
-        b = params['b'+str(l)]
-        m,n = b.shape
-        db = np.zeros((m,n))
-        for i in range(0,m):
-            for j in range(0,n):
-                tmp = b[i,j]
-                b[i,j] = tmp + check
-                up = compute_cost(params,hyperparams,X,y)
-                b[i,j] = tmp - check
-                down = compute_cost(params,hyperparams,X,y)
-                db[i,j] = (up - down)/(2.0*check)
-                b[i,j] = tmp
-        grads['db'+str(l)] = db
+    gradb = numerical_gradient_part(params,hyperparams,X,y,'b')
+    # merge the two parts of the gradient
+    grads = dict(gradW,**gradb)
 
     return grads
 
 
 def check_gradient(hyperparams=None, test_num = 5):
+    """
+    Checks if backward propagation computes correctly the gradient of the cost function
+
+    Arguments:
+    hyperparams -- python dictionary containing your hyperparameters
+    test_num -- how many test samples you will use
+    Returns:
+    difference -- difference between the approximated gradient and the backward propagation gradient
+
+    """
 
     deadline = 1e-8
 
     if hyperparams == None:
         hyperparams = {}
+
+    hyperparams['activition'] = 'sigmoid'
+    hyperparams['lamda'] = 1.
+    hyperparams['lossfunc'] = 'log_loss'
 
     if 'units' in hyperparams.keys():
         units = hyperparams['units']
@@ -214,8 +235,6 @@ def check_gradient(hyperparams=None, test_num = 5):
         # default number units of each layer
         units = [4,5,3]
         hyperparams['units'] = units
-    hyperparams['activition'] = 'sigmoid'
-    hyperparams['lamda'] = 1
 
     L = len(units)
     # the number of ouput classifications
@@ -224,16 +243,10 @@ def check_gradient(hyperparams=None, test_num = 5):
     feature_num = units[0]
     map = DataMap(range(0,class_num))
 
-    params = {}
-    for i in np.arange(1,L):
-        lin = units[i-1]
-        lout = units[i]
-        W,b = debug_init_params(lin,lout)
-        params['W'+str(i)] = W
-        params['b'+str(i)] = b
+    params = debug_init_params(units)
 
     # Reusing debug_init_paramsializeWeights to generate X
-    X,_ = debug_init_params( test_num, feature_num )
+    X,_ = debug_init_unit( test_num, feature_num )
     # generate corresponding y
     y = np.mod(np.arange(1,test_num+1),class_num)
     y = map.class2matrix(y)
@@ -242,25 +255,11 @@ def check_gradient(hyperparams=None, test_num = 5):
     grad2 = numerical_gradient(params,hyperparams,X,y)
 
     # calculate the norm of the difference of two kinds of W
-    fdW1 = np.array([])
-    fdW2 = np.array([])
-    for i in np.arange(1,L):
-        W1 = grad1['dW'+str(i)]
-        W2 = grad2['dW'+str(i)]
-        fdW1 = np.hstack((fdW1,W1.flatten()))
-        fdW2 = np.hstack((fdW2,W2.flatten()))
-    diffW = linalg.norm(fdW1 - fdW2)/linalg.norm(fdW1 + fdW2)
+    diffW = normdiff(grad1,grad2,prefix='dW')
     print ("Evaluate the norm of the difference between two dW: %e" % (diffW))
 
     # calculate the norm of the difference of two kinds of b
-    fdb1 = np.array([])
-    fdb2 = np.array([])
-    for i in np.arange(1,L):
-        b1 = grad1['db'+str(i)]
-        b2 = grad2['db'+str(i)]
-        fdb1 = np.hstack((fdb1,b1.flatten()))
-        fdb2 = np.hstack((fdb2,b2.flatten()))
-    diffb = linalg.norm(fdb1 - fdb2)/linalg.norm(fdb1 + fdb2)
+    diffb = normdiff(grad1,grad2,prefix='db')
     print ("Evaluate the norm of the difference between two db: %e" % (diffb))
 
     res = ( diffW < deadline ) and ( diffb < deadline )
@@ -268,4 +267,5 @@ def check_gradient(hyperparams=None, test_num = 5):
         print ("Passed the gradient check!")
     else:
         print ("Did not passed the gradient check!")
+
     return res
