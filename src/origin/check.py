@@ -17,14 +17,14 @@ class GradientCheck:
 
     def __init__(self, network,hyperparams=None):
         self.network = network
-
+        """
         if hyperparams == None:
             self.hyperparams = {}
         else:
             self.hyperparams = hyperparams
 
         self.hyperparams['activition'] = 'sigmoid'
-        self.hyperparams['lamda'] = 1.
+        self.hyperparams['L2_penalty'] = 1.
         self.hyperparams['lossfunc'] = 'log_loss'
 
         if 'units' in self.hyperparams.keys():
@@ -33,7 +33,11 @@ class GradientCheck:
             # default number units of each layer
             units = [4,5,3]
             self.hyperparams['units'] = units
-
+        """
+        units = [4,5,3]
+        self.hyperparams = self.network.get_hyperparams()
+        self.hyperparams['units'] = units
+        self.hyperparams['L2_penalty'] = 0.1
         L = len(units)
         # the number of ouput classifications
         class_num = units[L-1]
@@ -65,10 +69,10 @@ class GradientCheck:
                 for j in range(0,n):
                     tmp = value[i,j]
                     value[i,j] = tmp + check
-                    y_prob,_ = self.network.forward(self.params,self.hyperparams,self.X,self.y)
+                    y_prob,_ = self.network.forward(self.params,self.X,self.y)
                     up = compute_cost(self.params, self.hyperparams, self.y, y_prob)
                     value[i,j] = tmp - check
-                    y_prob,_ = self.network.forward(self.params,self.hyperparams,self.X,self.y)
+                    y_prob,_ = self.network.forward(self.params,self.X,self.y)
                     down = compute_cost(self.params, self.hyperparams, self.y, y_prob)
                     dTmp[i,j] = (up - down)/(2.0*check)
                     value[i,j] = tmp
@@ -113,7 +117,7 @@ class GradientCheck:
         """
 
         # calculate the gradient with two diffent ways
-        grad1 = self.network.backward(self.params,self.hyperparams,self.X,self.y)
+        grad1,_ = self.network.backward(self.params,self.X,self.y)
         grad2 = self.numerical_gradient()
 
         # calculate the norm of the difference of two kinds of W

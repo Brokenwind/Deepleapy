@@ -95,11 +95,11 @@ def compute_cost(params, hyperparams, y_true, y_prob):
     y: the label of relative x
     params: a list of all levels of estimated  value of unknown parameter
     reg: if it is True, means using regularized logistic. Default False
-    lamda: it is used when reg=True
+    L2_penalty: it is used when reg=True
     """
     # the regularition parameter
     units = hyperparams['units']
-    lamd = hyperparams['lamda']
+    L2_penalty = hyperparams['L2_penalty']
     loss = hyperparams['lossfunc']
 
     L = len(units)
@@ -118,6 +118,6 @@ def compute_cost(params, hyperparams, y_true, y_prob):
         b = params['b' + str(l)]
         regular += np.sum(W * W)
 
-    J += lamd/(2.0*m)*regular
+    J += L2_penalty/(2.0*m)*regular
 
     return J
