@@ -4,6 +4,8 @@ sys.path.append('../')
 sys.path.append('../../')
 from neural import *
 from datamap import *
+from loss import *
+from check import GradientCheck
 
 def load_params(fpath):
     params = {}
@@ -15,25 +17,53 @@ def load_params(fpath):
 
     return params
 
-def fitparams(X,Y):
+def fitBGD(network,X,Y):
     hyperparams = {}
     units = [400, 25, 10]
+    hyperparams['solver'] = 'BGD'
     hyperparams['units'] = units
-    hyperparams['activition'] = 'relu'
-    hyperparams['classifier'] = 'sigmoid'
-    hyperparams['lamda'] = 1.0
-    hyperparams['iters'] = 500
-    hyperparams['alpha'] = 0.2
+    hyperparams['lossfunc'] = 'log_loss'
+    hyperparams['activation'] = 'relu'
+    hyperparams['out_activation'] = 'sigmoid'
+    hyperparams['L2_penalty'] = 1.0
+    hyperparams['max_iters'] = 500
+    hyperparams['learning_rate_init'] = 0.2
 
+    network.set_hyperparams(hyperparams)
     tic = time.process_time()
-
-    params = gradient_descent(hyperparams,X,Y)
-
+    params = network.fit(X,Y)
     toc = time.process_time()
     print ("----- Computation time = " + str(1000*(toc - tic)) + "ms")
 
     # test forward propagation
-    Y1 = predict(params,hyperparams,X,Y)
+    Y1 = network.predict(params,X,Y)
+    y1 = map.matrix2index(Y1)
+    y0 = map.matrix2index(Y)
+    accuracy = np.sum(y1 == y0)/5000.0
+    print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
+
+
+def fitMBGD(network,X,Y):
+    hyperparams = {}
+    units = [400, 25, 10]
+    hyperparams['solver'] = 'MBGD'
+    hyperparams['units'] = units
+    hyperparams['lossfunc'] = 'log_loss'
+    hyperparams['activation'] = 'relu'
+    hyperparams['out_activation'] = 'sigmoid'
+    hyperparams['L2_penalty'] = 1.0
+    hyperparams['max_iters'] = 200
+    hyperparams['learning_rate_init'] = 0.15
+    hyperparams['batch_size'] = 512
+
+    network.set_hyperparams(hyperparams)
+    tic = time.process_time()
+    params = network.fit(X,Y)
+    toc = time.process_time()
+    print ("----- Computation time = " + str(1000*(toc - tic)) + "ms")
+
+    # test forward propagation
+    Y1 = network.predict(params,X,Y)
     y1 = map.matrix2index(Y1)
     y0 = map.matrix2index(Y)
     accuracy = np.sum(y1 == y0)/5000.0
@@ -50,23 +80,25 @@ if __name__ == '__main__':
     y = data['y']
     Y = map.class2matrix(y)
 
-
     hyperparams = {}
     units = [400, 25, 10]
-    hyperparams['units'] = units
-    hyperparams['activition'] = 'sigmoid'
-    hyperparams['classifier'] = 'sigmoid'
-    hyperparams['lamda'] = 0.0
+    network = OriginNeuralNetwork(units=units, activation='sigmoid', L2_penalty=0.0 )
+    hyperparams = network.get_hyperparams()
     # test cost function
-    cost = compute_cost(params,hyperparams,X,Y)
+    y_prob,_ = network.forward(params,X,Y)
+    cost = compute_cost(params,hyperparams,Y,y_prob)
     print('The cost value on test data is: ',cost)
     # test forward propagation
-    Y1 = predict(params,hyperparams,X,Y)
+    Y1 = network.predict(params,X,Y)
     y1 = map.matrix2index(Y1)
     y0 = map.matrix2index(Y)
     accuracy = np.sum(y1 == y0)/5000.0
     print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
-    # check backward propagation
-    check_gradient()
 
-    fitparams(X,Y)
+    # check backward propagation
+    check = GradientCheck(network)
+    check.check_gradient()
+
+    fitBGD(network,X,Y)
+    fitMBGD(network,X,Y)
+
