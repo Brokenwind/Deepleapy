@@ -8,8 +8,9 @@ from activation import *
 from datamap import *
 from prodata import *
 from loss import compute_cost
+from base import Classifier
 
-class OriginNeuralNetwork:
+class OriginNeuralNetwork(Classifier):
     """
     units : tuple, length = n_layers - 2, default (100,)
         The ith element represents the number of neurons in the ith
@@ -24,10 +25,9 @@ class OriginNeuralNetwork:
           returns f(x) = tanh(x).
         - 'relu', the rectified linear unit function,
           returns f(x) = max(0, x)
-    solver : {'BGD', 'SGD', 'MBGD'}, default 'adam'
+    solver : {'BGD','MBGD'}, default 'adam'
         The solver for weight optimization.
         - 'BGD' batch gradient descent
-        - 'SGD' refers to stochastic gradient descent.
         - 'MBGD' mini batch gradient descent
     L2_penalty : float, optional, default 0.0001
         L2 penalty (regularization term) parameter.
@@ -47,14 +47,15 @@ class OriginNeuralNetwork:
           Each time two consecutive epochs fail to decrease training loss by at
           least tol, or fail to increase validation score by at least tol if
           'early_stopping' is on, the current learning rate is divided by 5.
-        Only used when solver='SGD'.
+        Only used when solver='MBGD'.
     learning_rate_init : double, optional, default 0.001
         The initial learning rate used. It controls the step-size
-        in updating the weights. Only used when solver='SGD' or 'adam'.
+        in updating the weights. Only used when solver='MBGD' or 'adam'.
+
     max_iters : int, optional, default 200
         Maximum number of iterations. The solver iterates until convergence
         (determined by 'tol') or this number of iterations. For stochastic
-        solvers ('MSGD'), note that this determines the number of epochs
+        solvers ('MBGD'), note that this determines the number of epochs
         (how many times each data point will be used), not the number of
         gradient steps.
     tol : float, optional, default 1e-4
@@ -62,11 +63,30 @@ class OriginNeuralNetwork:
         by at least ``tol`` for ``n_iter_no_change`` consecutive iterations,
         unless ``learning_rate`` is set to 'adaptive', convergence is
         considered to be reached and training stops.
+    batch_size :
+    no_improve_num : int, optional, default 10
+        Maximum number of epochs to not meet ``tol`` improvement.
+        Only effective when solver='sgd' or 'adam'
+    early_stopping : 
     """
 
     hyperparams = {}
+    fitted_params = {}
+    iters_count = 0
+    no_improve_count = 0
+    # cost values of on every updated parameters
+    costs = []
+    # the best(minimal) cost value of all the current cost values
+    best_cost = 1e10
+    validation_scores = []
+    best_validation_score = 0.0
 
-    def __init__(self,units,model_type='classification',solver='BGD',lossfunc='log_loss',activation="relu",out_activation='sigmoid',learning_rate_type='constant',learning_rate_init=0.01,L2_penalty=0.01,max_iters=200, batch_size=64, tol=1e-4,verbose=True):
+    def __init__(self,units,
+                 model_type='classification',solver='BGD',
+                 lossfunc='log_loss',activation="relu",out_activation='sigmoid',
+                 learning_rate_type='constant',learning_rate_init=0.01,
+                 L2_penalty=0.01,max_iters=200, batch_size=64, tol=1e-4,
+                 verbose=True, no_improve_num=10, early_stopping=False):
         self.hyperparams['units'] = units
         self.hyperparams['solver'] = solver
         self.hyperparams['model_type'] = model_type
@@ -79,12 +99,21 @@ class OriginNeuralNetwork:
         self.hyperparams['max_iters'] = max_iters
         self.hyperparams['batch_size'] = batch_size
         self.hyperparams['tol'] = tol
+        self.hyperparams['no_improve_num'] = no_improve_num
+        self.hyperparams['early_stopping'] = early_stopping
 
     def get_hyperparams(self):
         """
         Return the current hyperparameters
         """
         return self.hyperparams
+
+    def get_costs(self):
+        """
+        Return the current all the cost values
+        """
+        # list.copy() only exists in Python3
+        return costs.copy()
 
     def set_hyperparams(self, hyperparams):
         """
@@ -93,7 +122,7 @@ class OriginNeuralNetwork:
         for key in hyperparams.keys():
             self.hyperparams[key] = hyperparams[key]
 
-    def forward(self, params, X, y):
+    def forward(self, params, X):
         """forward(params, self.hyperparams, X, y)
         X: the input of test data
         y: the output of test data
@@ -127,13 +156,16 @@ class OriginNeuralNetwork:
 
         return A, cache
 
-    def predict(self, params, X, y):
+    def predict(self, X, params=None):
         """predict(params,x,y)
         x: the input of test data
         y: the output of test data
         params: it is a list of out_activation params of each level.
         """
-        res,_ = self.forward(params, X, y)
+        if params == None:
+            res,_ = self.forward(self.fitted_params, X)
+        else:
+            res,_ = self.forward(params, X)
         return res
 
 
@@ -150,7 +182,7 @@ class OriginNeuralNetwork:
         gradients -- A dictionary with the gradients with respect to each parameter, activation and pre-activation variables
         """
 
-        Al,cache = self.forward(params,X,y)
+        Al,cache = self.forward(params,X)
         cost = compute_cost(params,self.hyperparams,y,Al)
         m = X.shape[1]
 
@@ -192,11 +224,61 @@ class OriginNeuralNetwork:
 
         return gradients, cost
 
+    def update_no_improve_count(self, X_val=None, y_val=None):
+        if self.hyperparams['early_stopping']:
+            # compute validation score, use that for stopping
+            self.validation_scores.append(self.score(X_val, y_val))
+
+            print("Validation score: %f" % self.validation_scores[-1])
+            # update best parameters
+            # use validation_scores, not loss_curve_
+            # let's hope no-one overloads .score with mse
+            last_valid_score = self.validation_scores[-1]
+
+            if last_valid_score < (self.best_validation_score + self.hyperparams['tol']):
+                self.no_improve_count += 1
+            else:
+                self.no_improve_count = 0
+
+            if last_valid_score > self.best_validation_score:
+                self.best_validation_score = last_valid_score
+        else:
+            if self.costs[-1] > self.best_cost - self.hyperparams['tol']:
+                self.no_improve_count += 1
+            else:
+                self.no_improve_count = 0
+            if self.costs[-1] < self.best_cost:
+                self.best_cost = self.costs[-1]
+
+    def trigger_stopping(self):
+        if self.iters_count >= self.hyperparams['max_iters']:
+            msg = ("Reached the max iterations %d, but training loss "
+                   "improved less than tol=%f." % (
+                       self.hyperparams['max_iters'], self.hyperparams['tol']))
+            print(msg)
+            return True
+
+        if self.no_improve_count > self.hyperparams['no_improve_num']:
+            # not better than last `no_improve_count` iterations by tol
+            # stop or decrease learning rate
+            if self.hyperparams['early_stopping']:
+                msg = ("Validation score did not improve more than "
+                       "tol=%f for %d consecutive epochs after %d iterations." % (
+                           self.hyperparams['tol'], self.no_improve_count, self.iters_count))
+            else:
+                msg = ("Training loss did not improve more than tol=%f"
+                       " for %d consecutive epochs after %d iterations." % (
+                           self.hyperparams['tol'], self.no_improve_count, self.iters_count))
+            print(msg)
+            return True
+
+        return False
 
     def BGD(self, X, y):
         """
         Batch gradient descent
         """
+        costs = []
         units = self.hyperparams['units']
         L = len(units)
         # the number of iterations
@@ -206,6 +288,7 @@ class OriginNeuralNetwork:
         precost = np.random.random()
         while max_iters > 0 :
             grads, cost = self.backward(params,X,y)
+            self.costs.append(cost)
             # update parameters with calculated gradients
             for l in range(1,L):
                 params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
@@ -227,27 +310,31 @@ class OriginNeuralNetwork:
         """
         Mini batch gradient descent
         """
+        self.costs = []
         num = X.shape[1]
         batch_size = self.hyperparams['batch_size']
         units = self.hyperparams['units']
         L = len(units)
-        # the number of iterations
-        max_iters = self.hyperparams['max_iters']
         learning_rate_init = self.hyperparams['learning_rate_init']
         params = init_params(units)
 
-        while max_iters > 0 :
+        for self.iters_count in range(1,self.hyperparams['max_iters']+1):
+            costs_sum = 0.0
             for batch_slice in gen_batches(num, batch_size):
                 grads, cost = self.backward(params,X[:,batch_slice],y[:,batch_slice])
+                costs_sum += cost * (batch_slice.stop - batch_slice.start)
                 # update parameters with calculated gradients
                 for l in range(1,L):
                     params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
                     params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]
-            max_iters -= 1
+            self.costs.append(costs_sum / X.shape[1])
+            self.update_no_improve_count()
+            if self.trigger_stopping():
+                break
 
         return params
 
-    SOLVERS = {'BGD':BGD, 'SGD':SGD, 'MBGD':MBGD}
+    SOLVERS = {'BGD':BGD, 'MBGD':MBGD}
 
 
     def fit(self, X, y):
@@ -265,4 +352,5 @@ class OriginNeuralNetwork:
         """
         solver_name = self.hyperparams['solver']
         solver = self.SOLVERS[solver_name]
-        return solver(self,X,y)
+        self.fitted_params = solver(self,X,y)
+        return self.fitted_params
