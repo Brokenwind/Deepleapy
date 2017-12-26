@@ -6,6 +6,7 @@ from neural import *
 from datamap import *
 from loss import *
 from check import GradientCheck
+from score import accuracy_score
 
 def load_params(fpath):
     params = {}
@@ -26,6 +27,7 @@ def fitBGD(network,X,Y):
     hyperparams['activation'] = 'relu'
     hyperparams['out_activation'] = 'sigmoid'
     hyperparams['L2_penalty'] = 1.0
+    hyperparams['tol'] = 0.01
     hyperparams['max_iters'] = 500
     hyperparams['learning_rate_init'] = 0.2
 
@@ -36,10 +38,7 @@ def fitBGD(network,X,Y):
     print ("----- Computation time = " + str(1000*(toc - tic)) + "ms")
 
     # test forward propagation
-    Y1 = network.predict(params,X,Y)
-    y1 = map.matrix2index(Y1)
-    y0 = map.matrix2index(Y)
-    accuracy = np.sum(y1 == y0)/5000.0
+    accuracy = network.score(X,Y)
     print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
 
 
@@ -53,6 +52,7 @@ def fitMBGD(network,X,Y):
     hyperparams['out_activation'] = 'sigmoid'
     hyperparams['L2_penalty'] = 1.0
     hyperparams['max_iters'] = 200
+    hyperparams['tol'] = 0.01
     hyperparams['learning_rate_init'] = 0.15
     hyperparams['batch_size'] = 512
 
@@ -63,10 +63,7 @@ def fitMBGD(network,X,Y):
     print ("----- Computation time = " + str(1000*(toc - tic)) + "ms")
 
     # test forward propagation
-    Y1 = network.predict(params,X,Y)
-    y1 = map.matrix2index(Y1)
-    y0 = map.matrix2index(Y)
-    accuracy = np.sum(y1 == y0)/5000.0
+    accuracy = network.score(X,Y)
     print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
 
 
@@ -85,14 +82,14 @@ if __name__ == '__main__':
     network = OriginNeuralNetwork(units=units, activation='sigmoid', L2_penalty=0.0 )
     hyperparams = network.get_hyperparams()
     # test cost function
-    y_prob,_ = network.forward(params,X,Y)
+    network.set_params(params)
+    y_prob,_ = network.forward(X)
+    print (y_prob.shape)
+    # test cost function
     cost = compute_cost(params,hyperparams,Y,y_prob)
     print('The cost value on test data is: ',cost)
     # test forward propagation
-    Y1 = network.predict(params,X,Y)
-    y1 = map.matrix2index(Y1)
-    y0 = map.matrix2index(Y)
-    accuracy = np.sum(y1 == y0)/5000.0
+    accuracy = network.score(X,Y)
     print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
 
     # check backward propagation
@@ -101,4 +98,3 @@ if __name__ == '__main__':
 
     fitBGD(network,X,Y)
     fitMBGD(network,X,Y)
-

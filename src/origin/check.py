@@ -15,25 +15,8 @@ class GradientCheck:
     y = None
     test_num = 5
 
-    def __init__(self, network,hyperparams=None):
+    def __init__(self,network,hyperparams=None):
         self.network = network
-        """
-        if hyperparams == None:
-            self.hyperparams = {}
-        else:
-            self.hyperparams = hyperparams
-
-        self.hyperparams['activition'] = 'sigmoid'
-        self.hyperparams['L2_penalty'] = 1.
-        self.hyperparams['lossfunc'] = 'log_loss'
-
-        if 'units' in self.hyperparams.keys():
-            units = self.hyperparams['units']
-        else:
-            # default number units of each layer
-            units = [4,5,3]
-            self.hyperparams['units'] = units
-        """
         units = [4,5,3]
         self.hyperparams = self.network.get_hyperparams()
         self.hyperparams['units'] = units
@@ -69,10 +52,11 @@ class GradientCheck:
                 for j in range(0,n):
                     tmp = value[i,j]
                     value[i,j] = tmp + check
-                    y_prob,_ = self.network.forward(self.params,self.X,self.y)
+                    y_prob,_ = self.network.forward(self.X, params=self.params)
                     up = compute_cost(self.params, self.hyperparams, self.y, y_prob)
                     value[i,j] = tmp - check
-                    y_prob,_ = self.network.forward(self.params,self.X,self.y)
+                    self.network.set_params(self.params)
+                    y_prob,_ = self.network.forward(self.X, params=self.params)
                     down = compute_cost(self.params, self.hyperparams, self.y, y_prob)
                     dTmp[i,j] = (up - down)/(2.0*check)
                     value[i,j] = tmp
@@ -117,7 +101,7 @@ class GradientCheck:
         """
 
         # calculate the gradient with two diffent ways
-        grad1,_ = self.network.backward(self.params,self.X,self.y)
+        grad1,_ = self.network.backward(self.X, self.y, params=self.params)
         grad2 = self.numerical_gradient()
 
         # calculate the norm of the difference of two kinds of W
