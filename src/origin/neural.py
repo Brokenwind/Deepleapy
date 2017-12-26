@@ -71,8 +71,12 @@ class OriginNeuralNetwork(Classifier):
     """
 
     hyperparams = {}
-    fitted_params = {}
+    params = {}
+    # how many layers of the neural network
+    layers = 0
+    # the number of iterations
     iters_count = 0
+    # the number of epochs to not meet ``tol`` improvement.
     no_improve_count = 0
     # cost values of on every updated parameters
     costs = []
@@ -102,9 +106,11 @@ class OriginNeuralNetwork(Classifier):
         self.hyperparams['no_improve_num'] = no_improve_num
         self.hyperparams['early_stopping'] = early_stopping
 
+        self.layers = len(units)
+
     def get_hyperparams(self):
         """
-        Return the current hyperparameters
+        Return the current hyperparamsarameters
         """
         return self.hyperparams
 
@@ -115,34 +121,54 @@ class OriginNeuralNetwork(Classifier):
         # list.copy() only exists in Python3
         return costs.copy()
 
+    def get_params(self):
+        """
+        Get the current parameters
+        """
+        return self.params.copy()
+
+    def set_params(self,params):
+        """
+        Set you own parameters to neural network
+        """
+        self.params = params.copy()
+
     def set_hyperparams(self, hyperparams):
         """
-        Change the part of current hyperparameters with given hyperparameters
+        Change the part of current hyperparamsarameters with given hyperparamsarameters
         """
         for key in hyperparams.keys():
             self.hyperparams[key] = hyperparams[key]
+        self.layers = len(self.hyperparams['units'])
 
-    def forward(self, params, X):
-        """forward(params, self.hyperparams, X, y)
-        X: the input of test data
-        y: the output of test data
-        params: it is a list of out_activation params of each level.
-
-        Return: the  final result a and all middle value z
+    def forward(self, X, params=None):
+        """Forward propatation of neural network
+        Parameters
+        ----------
+        X : np.ndarray (features, samples)
+            the input of test data
+        y : np.ndarray (classes, samples)
+            the output of test data
+        params : python dictionary (if it is not set, the function will use self.params instead)
+            python dictionary containing your parameters "Wl", "bl"(l means the lth layer)
+        Returns
+        -------
+        A : the result of last layer
+        cache : "Wl", "bl"(l means the lth layer)of all the layers
         """
-        units = self.hyperparams['units']
+        if params is not None:
+            self.params = params
         # activation function
         activation = self.hyperparams['activation']
-        L = len(units)
         cache={}
         # LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SIGMOID
         A = X.copy()
         cache['A0'] = A
-        for l in range(1, L):
-            W = params['W' + str(l)]
-            b = params['b' + str(l)]
+        for l in range(1, self.layers):
+            W = self.params['W' + str(l)]
+            b = self.params['b' + str(l)]
             Z = np.dot(W, A) + b
-            if l != L - 1:
+            if l != self.layers - 1:
                 if activation == 'relu':
                     A = relu(Z)
                 else:
@@ -156,53 +182,54 @@ class OriginNeuralNetwork(Classifier):
 
         return A, cache
 
-    def predict(self, X, params=None):
-        """predict(params,x,y)
+    def predict(self, X):
+        """predict(x,params)
+        It will use trainned model to predict the result, if use want to predict
+        with you own model, you can call set_pramas(parameters) at firt,
+        and than call this function.
         x: the input of test data
         y: the output of test data
-        params: it is a list of out_activation params of each level.
         """
-        if params == None:
-            res,_ = self.forward(self.fitted_params, X)
-        else:
-            res,_ = self.forward(params, X)
+        res,_ = self.forward(X)
         return res
 
 
-    def backward(self, params, X, y):
+    def backward(self, X, y, params=None):
         """
-        Implement the backward propagation presented in figure 2.
-
-        Arguments:
-        X -- input dataset, of shape (input size, number of examples)
-        Y -- true "label" vector (containing 0 if cat, 1 if non-cat)
-        cache -- cache output from forward_propagation()
-
-        Returns:
-        gradients -- A dictionary with the gradients with respect to each parameter, activation and pre-activation variables
+        Backward propagation of neural network
+        Parameters
+        ----------
+        X : np.ndarray (features, samples)
+            the input of test data
+        y : np.ndarray (classes, samples)
+            the output of test data
+        params : python dictionary (if it is not set, the function will use self.params instead)
+            python dictionary containing your parameters "Wl", "bl"(l means the lth layer) 
+        Returns
+        -------
+        gradients: python dictionary
+            A dictionary with the gradients of each parameter
         """
-
-        Al,cache = self.forward(params,X)
-        cost = compute_cost(params,self.hyperparams,y,Al)
+        if params is not None:
+            self.params = params
+        Al,cache = self.forward(X)
+        cost = compute_cost(self.params,self.hyperparams,y,Al)
         m = X.shape[1]
-
-        units = self.hyperparams['units']
         # activation function
         activation = self.hyperparams['activation']
         L2_penalty = self.hyperparams['L2_penalty']
-        L = len(units)
         gradients = {}
 
-        for l in range(L-1,0,-1):
+        for l in range(self.layers-1,0,-1):
             Z = cache['Z'+str(l)]
             A = cache['A'+str(l-1)]
-            if l == L-1 :
+            if l == self.layers-1 :
                 dZ = Al - y
                 dW = 1./m * np.dot(dZ, A.T)
                 db = 1./m * np.sum(dZ, axis=1, keepdims = True)
             else:
                 # use W in previous layer
-                Wp = params['W'+str(l+1)]
+                Wp = self.params['W'+str(l+1)]
                 # use calculated dZ in previous layer
                 dA = np.dot(Wp.T, dZ)
                 if activation == 'relu':
@@ -216,7 +243,7 @@ class OriginNeuralNetwork(Classifier):
                 db = 1./m * np.sum(dZ, axis=1, keepdims = True)
 
             # add regularition item
-            dW += 1.0*L2_penalty/m * params['W'+str(l)]
+            dW += 1.0*L2_penalty/m * self.params['W'+str(l)]
 
             gradients['dZ'+str(l)] = dZ
             gradients['dW'+str(l)] = dW
@@ -274,65 +301,68 @@ class OriginNeuralNetwork(Classifier):
 
         return False
 
+    def algorithm_init(self):
+        """
+        Initialize some parameters before start algorithm.
+        """
+        self.iters_count = 0
+        self.no_improve_count = 0
+        # cost values of on every updated parameters
+        self.costs = []
+        # the best(minimal) cost value of all the current cost values
+        self.best_cost = 1e10
+        self.validation_scores = []
+        self.best_validation_score = 0.0
+        units = self.hyperparams['units']
+        self.layers = len(units)
+        self.params = init_params(units)
+
     def BGD(self, X, y):
         """
         Batch gradient descent
         """
-        costs = []
-        units = self.hyperparams['units']
-        L = len(units)
+        self.algorithm_init()
         # the number of iterations
         max_iters = self.hyperparams['max_iters']
         learning_rate_init = self.hyperparams['learning_rate_init']
-        params = init_params(units)
-        precost = np.random.random()
-        while max_iters > 0 :
-            grads, cost = self.backward(params,X,y)
+
+        for self.iters_count in range(1,self.hyperparams['max_iters']+1):
+            grads, cost = self.backward(X,y)
             self.costs.append(cost)
             # update parameters with calculated gradients
-            for l in range(1,L):
-                params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
-                params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]
-            diff = abs(precost - cost)
-            if diff < self.hyperparams['tol']:
+            for l in range(1,self.layers):
+                self.params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
+                self.params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]
+            self.update_no_improve_count()
+            if self.trigger_stopping():
                 break
 
-            max_iters -= 1
-            if max_iters == 0:
-                msg = ("Reached the max iterations %d, training loss improved %f, it is not less than tol=%f." % (self.hyperparams['max_iters'], diff, self.hyperparams['tol']))
-                print(msg)
-
-            precost = cost
-
-        return params
+        return self.params
 
     def MBGD(self, X, y):
         """
         Mini batch gradient descent
         """
-        self.costs = []
+        self.algorithm_init()
         num = X.shape[1]
         batch_size = self.hyperparams['batch_size']
-        units = self.hyperparams['units']
-        L = len(units)
         learning_rate_init = self.hyperparams['learning_rate_init']
-        params = init_params(units)
 
         for self.iters_count in range(1,self.hyperparams['max_iters']+1):
             costs_sum = 0.0
             for batch_slice in gen_batches(num, batch_size):
-                grads, cost = self.backward(params,X[:,batch_slice],y[:,batch_slice])
+                grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
                 costs_sum += cost * (batch_slice.stop - batch_slice.start)
                 # update parameters with calculated gradients
-                for l in range(1,L):
-                    params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
-                    params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]
+                for l in range(1,self.layers):
+                    self.params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
+                    self.params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count()
             if self.trigger_stopping():
                 break
 
-        return params
+        return self.params
 
     SOLVERS = {'BGD':BGD, 'MBGD':MBGD}
 
@@ -352,5 +382,5 @@ class OriginNeuralNetwork(Classifier):
         """
         solver_name = self.hyperparams['solver']
         solver = self.SOLVERS[solver_name]
-        self.fitted_params = solver(self,X,y)
-        return self.fitted_params
+        self.params = solver(self,X,y)
+        return self.params
