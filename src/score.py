@@ -7,31 +7,19 @@ def check_consistent_length(*arrays):
     *arrays : list or tuple of 2D np.ndarray data.
         Objects that will be checked for consistent length.
     """
-    rows = []
-    cols = []
-    for item in arrays:
-        item = np.array(item)
-        if item.ndim == 1:
-            item = item.reshape((1,item.size))
-        rows.append(item.shape[0])
-        cols.append(item.shape[1])
-    unirows = np.unique(rows)
-    unicols = np.unique(cols)
-    if len(unirows) > 1 or len(unicols) > 1:
-        print (" rows: %r" % [int(l) for l in rows])
-        print (" cols: %r" % [int(l) for l in cols])
-        raise ValueError("Found shapes of input variables are not inconsistent")
+    shapes = [ X.shape for X in arrays if X is not None ]
+    for i in range(1,len(shapes)):
+        if shapes[i] != shapes[i-1]:
+            raise ValueError("Found shapes of input variables are not inconsistent : %r" % shapes )
 
 def accuracy_score(y_true, y_pred, normalize=True):
     """Accuracy classification score.
-    In multilabel classification, this function computes subset accuracy:
-    the set of labels predicted for a sample must *exactly* match the
-    corresponding set of labels in y_true.
+    the ratio of correct classification
     Parameters
     ----------
-    y_true : array-like
+    y_true : array-like (features, samples)
         Ground truth (correct) labels.
-    y_pred : array-like
+    y_pred : array-like (features, samples)
         Predicted labels, as returned by a classifier.
     normalize : bool, optional (default=True)
         If ``False``, return the number of correctly classified samples.
