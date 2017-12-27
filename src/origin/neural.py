@@ -12,6 +12,9 @@ from base import Classifier
 
 class OriginNeuralNetwork(Classifier):
     """
+    classes : tuple, list, np.ndarray
+        This constains the different classes of you labels. len(classes) should
+        be equal to the last value of units(except when it is 1 meaning binary classification )
     units : tuple, length = n_layers - 2, default (100,)
         The ith element represents the number of neurons in the ith
         hidden layer.
@@ -84,6 +87,7 @@ class OriginNeuralNetwork(Classifier):
     best_cost = 1e10
     validation_scores = []
     best_validation_score = 0.0
+    # it is the instance of DataMap, which will tranform between names of classes and its indexes
 
     def __init__(self,units,
                  model_type='classification',solver='BGD',
@@ -91,6 +95,9 @@ class OriginNeuralNetwork(Classifier):
                  learning_rate_type='constant',learning_rate_init=0.01,
                  L2_penalty=0.01,max_iters=200, batch_size=64, tol=1e-4,
                  verbose=True, no_improve_num=10, early_stopping=False):
+
+        self.layers = len(units)
+
         self.hyperparams['units'] = units
         self.hyperparams['solver'] = solver
         self.hyperparams['model_type'] = model_type
@@ -106,13 +113,12 @@ class OriginNeuralNetwork(Classifier):
         self.hyperparams['no_improve_num'] = no_improve_num
         self.hyperparams['early_stopping'] = early_stopping
 
-        self.layers = len(units)
 
     def get_hyperparams(self):
         """
         Return the current hyperparamsarameters
         """
-        return self.hyperparams
+        return self.hyperparams.copy()
 
     def get_costs(self):
         """
@@ -138,7 +144,10 @@ class OriginNeuralNetwork(Classifier):
         Change the part of current hyperparamsarameters with given hyperparamsarameters
         """
         for key in hyperparams.keys():
-            self.hyperparams[key] = hyperparams[key]
+            if key in self.hyperparams.keys():
+                self.hyperparams[key] = hyperparams[key]
+            else:
+                raise ValueError('The "%s" is not a hyperparam' % (key))
         self.layers = len(self.hyperparams['units'])
 
     def forward(self, X, params=None):
@@ -161,7 +170,6 @@ class OriginNeuralNetwork(Classifier):
         # activation function
         activation = self.hyperparams['activation']
         cache={}
-        # LINEAR -> RELU -> LINEAR -> RELU -> LINEAR -> SIGMOID
         A = X.copy()
         cache['A0'] = A
         for l in range(1, self.layers):
