@@ -75,6 +75,7 @@ if __name__ == '__main__':
 
     X = data['X']
     y = data['y']
+
     Y = map.class2matrix(y)
 
     hyperparams = {}

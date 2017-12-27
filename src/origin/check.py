@@ -21,6 +21,7 @@ class GradientCheck:
         self.hyperparams = self.network.get_hyperparams()
         self.hyperparams['units'] = units
         self.hyperparams['L2_penalty'] = 0.1
+        self.network.set_hyperparams(self.hyperparams)
         L = len(units)
         # the number of ouput classifications
         class_num = units[L-1]
