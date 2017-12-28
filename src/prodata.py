@@ -148,3 +148,50 @@ def gen_batches(n, batch_size):
         start = end
     if start < n:
         yield slice(start, n)
+
+def train_test_split(X, y, **options):
+    """Split arrays or matrices into train and test subsets
+    Parameters
+    ----------
+    X : np.ndarray shape (n_features, n_samples)
+    y : np.ndarray shape (n_classes, n_samples)/(n_samples,)/(1,n_samples)
+    test_size : float, int, None, optional
+        If float, should be between 0.0 and 1.0 and represent the proportion
+        of the dataset to include in the test split.If None, the value is set
+        to 0.25.
+    shuffle : boolean, optional (default=True)
+        Whether or not to shuffle the data before splitting. If shuffle=False
+        then data is split in a stratified fashion
+    Returns
+    -------
+    X_train :
+    y_train :
+    X_test  :
+    y_test  :
+    """
+    if X is None or y is None:
+        raise ValueError("Input data is None")
+    X = np.array(X)
+    y = np.array(y)
+    if y.ndim == 1:
+        y = y.reshape((1,y.size))
+    if X.shape[1] != y.shape[1]:
+        raise ValueError("X and y don't have the same number of samples")
+    test_size = options.pop('test_size', None)
+    shuffle = options.pop('shuffle', True)
+
+    if options:
+        raise TypeError("Invalid parameters passed: %s" % str(options))
+
+    if test_size is None:
+        test_size = 0.25
+
+    # shuffle the data
+    if shuffle:
+        perm = np.random.permutation(y.shape[1])
+        X = X[:,perm]
+        y = y[:,perm]
+
+    test_num = int(y.shape[1] * 0.25)
+
+    return X[:,test_num:], y[:,test_num:], X[:,0:test_num], y[:,0:test_num]
