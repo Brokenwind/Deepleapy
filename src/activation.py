@@ -5,12 +5,12 @@ def identity(X):
     """Simply return the input array.
     Parameters
     ----------
-    X : {array-like, sparse matrix}, shape (n_samples, n_features)
+    X : {array-like, sparse matrix}, shape (n_features, n_samples)
         Data, where n_samples is the number of samples
         and n_features is the number of features.
     Returns
     -------
-    X : {array-like, sparse matrix}, shape (n_samples, n_features)
+    X : {array-like, sparse matrix}, shape (n_features, n_samples)
         Same as the input data.
     """
     return X
@@ -19,11 +19,11 @@ def sigmoid(x):
     """
     Compute the sigmoid of x
 
-    Arguments:
-    x -- A scalar or numpy array of any size.
+    Parameters:
+    X : A scalar or numpy array of any size.
 
-    Return:
-    s -- sigmoid(x)
+    Returns
+    s : sigmoid(x)
     """
     s = 1.0/(1.0+np.exp(-x))
     return s
@@ -32,11 +32,11 @@ def relu(x):
     """
     Compute the relu of x
 
-    Arguments:
-    x -- A scalar or numpy array of any size.
+    Parameters:
+    X : A scalar or numpy array of any size.
 
-    Return:
-    s -- relu(x)
+    Returns
+    s : relu(x)
     """
     s = np.maximum(0,x)
 
@@ -46,11 +46,11 @@ def tanh(X):
     """Compute the hyperbolic tan function inplace.
     Parameters
     ----------
-    X : {array-like, sparse matrix}, shape (n_samples, n_features)
+    X : {array-like, sparse matrix}, shape (n_features, n_samples)
         The input data.
     Returns
     -------
-    X_new : {array-like, sparse matrix}, shape (n_samples, n_features)
+    X_new : {array-like, sparse matrix}, shape (n_features, n_samples)
         The transformed data.
     """
     return np.tanh(X, out=X)
@@ -64,22 +64,14 @@ def softmax(x):
     functions np.exp, np.sum, np.reshape, np.max, and numpy
     broadcasting useful for this task.
 
-    Numpy broadcasting documentation:
-    http://docs.scipy.org/doc/numpy/user/basics.broadcasting.html
-
-    You should also make sure that your code works for a single
-    N-dimensional vector (treat the vector as a single row) and
-    for M x N matrices. This may be useful for testing later. Also,
-    make sure that the dimensions of the output match the input.
-
-    You must implement the optimization in problem 1(a) of the
-    written assignment!
-
-    Arguments:
-    x -- A N dimensional vector or M x N dimensional numpy matrix.
-
-    Return:
-    x -- You are allowed to modify x in-place
+    Parameters
+    ----------
+    x : {array-like, sparse matrix}, shape (n_features, n_samples)
+        input data
+    Returns:
+    ----------
+    x : {array-like, sparse matrix}
+        softmax(x)
     """
     orig_shape = x.shape
 
@@ -87,13 +79,13 @@ def softmax(x):
         # Matrix
 
         # 1. Subtract the max value for solving overflow problem since we proved that softmax is invariat to constant offsets.
-        tmp = np.max(x,axis=1)
-        x-=tmp.reshape((x.shape[0],1))# here we use Numpy broadcasting
+        tmp = np.max(x,axis=0,keepdims=True)
+        x-=tmp
 
         # 2. compute the softmax
         x = np.exp(x)
-        tmp = np.sum(x, axis = 1)
-        x /= tmp.reshape((x.shape[0], 1))# here we use Numpy broadcasting
+        tmp = np.sum(x, axis = 0, keepdims=True)
+        x /= tmp
     else:
         # Vector 
         tmp = np.max(x)
@@ -109,10 +101,10 @@ def identity_derivative(Z, delta):
     """Apply the derivative of the identity function: do nothing.
     Parameters
     ----------
-    Z : {array-like, sparse matrix}, shape (n_samples, n_features)
+    Z : {array-like, sparse matrix}, shape (n_features, n_samples)
         The data which was output from the identity activation function during
         the forward pass.
-    delta : {array-like}, shape (n_samples, n_features)
+    delta : {array-like}, shape (n_features, n_samples)
          The backpropagated error signal to be modified inplace.
     """
     # Nothing to do
@@ -123,10 +115,10 @@ def sigmoid_derivative(Z, delta):
     value from logistic function.
     Parameters
     ----------
-    Z : {array-like, sparse matrix}, shape (n_samples, n_features)
+    Z : {array-like, sparse matrix}, shape (n_features, n_samples)
         The data which was output from the logistic activation function during
         the forward pass.
-    delta : {array-like}, shape (n_samples, n_features)
+    delta : {array-like}, shape (n_features, n_samples)
          The backpropagated error signal to be modified inplace.
     """
     delta *= Z
@@ -139,10 +131,10 @@ def tanh_derivative(Z, delta):
     value from hyperbolic tangent.
     Parameters
     ----------
-    Z : {array-like, sparse matrix}, shape (n_samples, n_features)
+    Z : {array-like, sparse matrix}, shape (n_features, n_samples)
         The data which was output from the hyperbolic tangent activation
         function during the forward pass.
-    delta : {array-like}, shape (n_samples, n_features)
+    delta : {array-like}, shape (n_features, n_samples)
          The backpropagated error signal to be modified inplace.
     """
     delta *= (1 - Z ** 2)
@@ -154,10 +146,10 @@ def relu_derivative(Z, delta):
     value from rectified linear units activation function.
     Parameters
     ----------
-    Z : {array-like, sparse matrix}, shape (n_samples, n_features)
+    Z : {array-like, sparse matrix}, shape (n_features, n_samples)
         The data which was output from the rectified linear units activation
         function during the forward pass.
-    delta : {array-like}, shape (n_samples, n_features)
+    delta : {array-like}, shape (n_features, n_samples)
          The backpropagated error signal to be modified inplace.
     """
     delta[Z == 0] = 0
