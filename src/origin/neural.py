@@ -102,7 +102,8 @@ class OriginNeuralNetwork(Classifier):
                  lossfunc='log_loss',activation="relu",out_activation='sigmoid',
                  learning_rate_type='constant',learning_rate_init=0.01,
                  L2_penalty=0.01,max_iters=200, batch_size=64, tol=1e-4,
-                 verbose=False, no_improve_num=10, early_stopping=False):
+                 verbose=False, no_improve_num=10, early_stopping=False,
+                 momentum_beta=0.9):
 
         self.layers = len(units)
 
@@ -121,6 +122,7 @@ class OriginNeuralNetwork(Classifier):
         self.hyperparams['verbose'] = verbose
         self.hyperparams['no_improve_num'] = no_improve_num
         self.hyperparams['early_stopping'] = early_stopping
+        self.hyperparams['momentum_beta'] = momentum_beta
 
 
     def get_hyperparams(self):
@@ -394,7 +396,48 @@ class OriginNeuralNetwork(Classifier):
 
         return self.params
 
-    SOLVERS = {'BGD':BGD, 'MBGD':MBGD}
+
+    def Momentum(self, X, y):
+        """
+        Momentum gradient gradient descent
+        """
+        self.algorithm_init()
+        X_test = None
+        y_test = None
+        if self.hyperparams['early_stopping']:
+            X, y, X_test, y_test = train_test_split(X,y)
+        num = X.shape[1]
+        batch_size = self.hyperparams['batch_size']
+        learning_rate_init = self.hyperparams['learning_rate_init']
+
+        units = self.hyperparams['units']
+
+        momentumW = self.layers * [None]
+        momentumb = self.layers * [None]
+        for l in range(1,self.layers):
+            momentumW[l] = np.zeros((units[l], units[l-1]))
+            momentumb[l] = np.zeros((units[l], 1))
+
+        moment_beta = self.hyperparams['momentum_beta']
+        for self.iters_count in range(1,self.hyperparams['max_iters']+1):
+            costs_sum = 0.0
+            for batch_slice in gen_batches(num, batch_size):
+                grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
+                costs_sum += cost * (batch_slice.stop - batch_slice.start)
+                # update parameters with calculated gradients
+                for l in range(1,self.layers):
+                    momentumW[l] = moment_beta*momentumW[l] + (1-moment_beta)*grads['dW' + str(l)]
+                    momentumb[l] = moment_beta*momentumb[l] + (1-moment_beta)*grads['db' + str(l)]
+                    self.params['W' + str(l)] -= learning_rate_init * momentumW[l]
+                    self.params['b' + str(l)] -= learning_rate_init * momentumb[l]
+            self.costs.append(costs_sum / X.shape[1])
+            self.update_no_improve_count(X_test, y_test)
+            if self.trigger_stopping():
+                break
+
+        return self.params
+
+    SOLVERS = {'BGD':BGD, 'MBGD':MBGD, 'Momentum':Momentum}
 
 
     def fit(self, X, y):
