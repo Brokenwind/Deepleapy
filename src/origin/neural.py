@@ -1,6 +1,7 @@
 import os
 import sys
 sys.path.append('..')
+import time
 import numpy as np
 import numpy.linalg as linalg
 import scipy.optimize as op
@@ -169,22 +170,30 @@ class OriginNeuralNetwork(Classifier):
             self.params = params
         # activation function
         activation = self.hyperparams['activation']
+        out_activation = self.hyperparams['out_activation']
         cache={}
-        A = X.copy()
+        A = X
         cache['A0'] = A
         for l in range(1, self.layers):
             W = self.params['W' + str(l)]
             b = self.params['b' + str(l)]
             Z = np.dot(W, A) + b
+            # the media layer
             if l != self.layers - 1:
                 if activation == 'relu':
                     A = relu(Z)
-                else:
+                elif activation == 'sigmoid':
                     A = sigmoid(Z)
-		            # the last layer is using sigmoid to do classification
+                else:
+                    raise ValueError('No such activation: %s' % (activation))
+		    # the last layer is using sigmoid to do classification
             else:
-                A = sigmoid(Z)
-
+                if out_activation == 'softmax':
+                    A = softmax(Z)
+                elif out_activation == 'sigmoid':
+                    A = sigmoid(Z)
+                else:
+                    raise ValueError('No such out activation: %s' % (activation))
             cache['Z'+str(l)] = Z
             cache['A'+str(l)] = A
 
@@ -225,9 +234,9 @@ class OriginNeuralNetwork(Classifier):
         m = X.shape[1]
         # activation function
         activation = self.hyperparams['activation']
+        out_activation = self.hyperparams['out_activation']
         L2_penalty = self.hyperparams['L2_penalty']
         gradients = {}
-
         for l in range(self.layers-1,0,-1):
             Z = cache['Z'+str(l)]
             A = cache['A'+str(l-1)]
@@ -243,9 +252,11 @@ class OriginNeuralNetwork(Classifier):
                 if activation == 'relu':
                     # np.int64(A > 0) is the gradient of ReLU
                     dZ = dA * np.int64(Z > 0)
-                else:
+                elif activation == 'sigmoid':
                     gZ = sigmoid(Z)
                     dZ = dA * gZ * (1-gZ)
+                else:
+                    raise ValueError('No such activation: %s' % (activation))
 
                 dW = 1./m * np.dot(dZ, A.T)
                 db = 1./m * np.sum(dZ, axis=1, keepdims = True)
@@ -390,5 +401,9 @@ class OriginNeuralNetwork(Classifier):
         """
         solver_name = self.hyperparams['solver']
         solver = self.SOLVERS[solver_name]
+        tic = time.time()
         self.params = solver(self,X,y)
+        toc = time.time()
+        print ("-------- Computation time  on dataset with algorithm %s is %f ms" % (solver_name, toc - tic))
+
         return self.params
