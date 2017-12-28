@@ -27,16 +27,12 @@ def fitBGD(network,X,Y):
     hyperparams['activation'] = 'relu'
     hyperparams['out_activation'] = 'sigmoid'
     hyperparams['L2_penalty'] = 1.0
-    hyperparams['tol'] = 0.01
+    hyperparams['tol'] = 0.001
     hyperparams['max_iters'] = 500
     hyperparams['learning_rate_init'] = 0.2
 
     network.set_hyperparams(hyperparams)
-    tic = time.process_time()
     params = network.fit(X,Y)
-    toc = time.process_time()
-    print ("----- Computation time = " + str(1000*(toc - tic)) + "ms")
-
     # test forward propagation
     accuracy = network.score(X,Y)
     print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
@@ -47,21 +43,38 @@ def fitMBGD(network,X,Y):
     units = [400, 25, 10]
     hyperparams['solver'] = 'MBGD'
     hyperparams['units'] = units
-    hyperparams['lossfunc'] = 'log_loss'
     hyperparams['activation'] = 'relu'
     hyperparams['out_activation'] = 'sigmoid'
+    hyperparams['lossfunc'] = 'log_loss'
     hyperparams['L2_penalty'] = 1.0
     hyperparams['max_iters'] = 200
-    hyperparams['tol'] = 0.01
+    hyperparams['tol'] = 0.001
     hyperparams['learning_rate_init'] = 0.15
     hyperparams['batch_size'] = 512
 
     network.set_hyperparams(hyperparams)
-    tic = time.process_time()
     params = network.fit(X,Y)
-    toc = time.process_time()
-    print ("----- Computation time = " + str(1000*(toc - tic)) + "ms")
+    # test forward propagation
+    accuracy = network.score(X,Y)
+    print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
 
+
+def fitMBGD2(network,X,Y):
+    hyperparams = {}
+    units = [400, 25, 10]
+    hyperparams['solver'] = 'MBGD'
+    hyperparams['units'] = units
+    hyperparams['activation'] = 'relu'
+    hyperparams['out_activation'] = 'softmax'
+    hyperparams['lossfunc'] = 'softmax_loss'
+    hyperparams['L2_penalty'] = 1.0
+    hyperparams['max_iters'] = 200
+    hyperparams['tol'] = 0.001
+    hyperparams['learning_rate_init'] = 0.15
+    hyperparams['batch_size'] = 512
+
+    network.set_hyperparams(hyperparams)
+    params = network.fit(X,Y)
     # test forward propagation
     accuracy = network.score(X,Y)
     print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
@@ -85,7 +98,6 @@ if __name__ == '__main__':
     # test cost function
     network.set_params(params)
     y_prob,_ = network.forward(X)
-    print (y_prob.shape)
     # test cost function
     cost = compute_cost(params,hyperparams,Y,y_prob)
     print('The cost value on test data is: ',cost)
@@ -95,7 +107,8 @@ if __name__ == '__main__':
 
     # check backward propagation
     check = GradientCheck(network)
-    check.check_gradient()
+    check.checks()
 
     fitBGD(network,X,Y)
     fitMBGD(network,X,Y)
+    fitMBGD2(network,X,Y)
