@@ -55,7 +55,6 @@ class OriginNeuralNetwork(Classifier):
     learning_rate_init : double, optional, default 0.001
         The initial learning rate used. It controls the step-size
         in updating the weights. Only used when solver='MBGD' or 'adam'.
-
     max_iters : int, optional, default 200
         Maximum number of iterations. The solver iterates until convergence
         (determined by 'tol') or this number of iterations. For stochastic
@@ -67,11 +66,19 @@ class OriginNeuralNetwork(Classifier):
         by at least ``tol`` for ``n_iter_no_change`` consecutive iterations,
         unless ``learning_rate`` is set to 'adaptive', convergence is
         considered to be reached and training stops.
-    batch_size :
+    batch_size : int, default '64'
+        Size of minibatches for minibatch gradient descent.
+        If the solver is 'BGD', the classifier will not use minibatch.
     no_improve_num : int, optional, default 10
         Maximum number of epochs to not meet ``tol`` improvement.
         Only effective when solver='sgd' or 'adam'
-    early_stopping : 
+    early_stopping : bool, default False
+        Whether to use early stopping to terminate training when validation
+        score is not improving. If set to true, it will automatically set
+        aside 10% of training data as validation and terminate training when
+        validation score is not improving by at least tol for
+        ``no_improve_num`` consecutive epochs.
+        Only effective when solver='MBGD' or 'ADAM'
     """
 
     hyperparams = {}
@@ -95,7 +102,7 @@ class OriginNeuralNetwork(Classifier):
                  lossfunc='log_loss',activation="relu",out_activation='sigmoid',
                  learning_rate_type='constant',learning_rate_init=0.01,
                  L2_penalty=0.01,max_iters=200, batch_size=64, tol=1e-4,
-                 verbose=True, no_improve_num=10, early_stopping=False):
+                 verbose=False, no_improve_num=10, early_stopping=False):
 
         self.layers = len(units)
 
@@ -111,6 +118,7 @@ class OriginNeuralNetwork(Classifier):
         self.hyperparams['max_iters'] = max_iters
         self.hyperparams['batch_size'] = batch_size
         self.hyperparams['tol'] = tol
+        self.hyperparams['verbose'] = verbose
         self.hyperparams['no_improve_num'] = no_improve_num
         self.hyperparams['early_stopping'] = early_stopping
 
@@ -274,8 +282,8 @@ class OriginNeuralNetwork(Classifier):
         if self.hyperparams['early_stopping']:
             # compute validation score, use that for stopping
             self.validation_scores.append(self.score(X_val, y_val))
-
-            print("Validation score: %f" % self.validation_scores[-1])
+            if self.hyperparams['verbose']:
+                print("Validation score: %f" % (self.validation_scores[-1]) )
             # update best parameters
             # use validation_scores, not loss_curve_
             # let's hope no-one overloads .score with mse
@@ -299,7 +307,7 @@ class OriginNeuralNetwork(Classifier):
     def trigger_stopping(self):
         if self.iters_count >= self.hyperparams['max_iters']:
             msg = ("Reached the max iterations %d, but training loss "
-                   "improved less than tol=%f." % (
+                   "improved still more than tol=%f." % (
                        self.hyperparams['max_iters'], self.hyperparams['tol']))
             print(msg)
             return True
@@ -363,10 +371,13 @@ class OriginNeuralNetwork(Classifier):
         Mini batch gradient descent
         """
         self.algorithm_init()
+        X_test = None
+        y_test = None
+        if self.hyperparams['early_stopping']:
+            X, y, X_test, y_test = train_test_split(X,y)
         num = X.shape[1]
         batch_size = self.hyperparams['batch_size']
         learning_rate_init = self.hyperparams['learning_rate_init']
-
         for self.iters_count in range(1,self.hyperparams['max_iters']+1):
             costs_sum = 0.0
             for batch_slice in gen_batches(num, batch_size):
@@ -377,7 +388,7 @@ class OriginNeuralNetwork(Classifier):
                     self.params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
                     self.params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]
             self.costs.append(costs_sum / X.shape[1])
-            self.update_no_improve_count()
+            self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():
                 break
 
@@ -390,7 +401,7 @@ class OriginNeuralNetwork(Classifier):
         """Fit the model to data matrix X and target(s) y.
         Parameters
         ----------
-        X : array-like or sparse matrix, shape (n_samples, n_features)
+        X : array-like or sparse matrix, shape (n_features, n_samples)
             The input data.
         y : array-like, shape (n_samples,) or (n_samples, n_outputs)
             The target values (class labels in classification, real numbers in
