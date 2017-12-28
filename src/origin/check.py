@@ -20,8 +20,6 @@ class GradientCheck:
         units = [4,5,3]
         self.hyperparams = self.network.get_hyperparams()
         self.hyperparams['units'] = units
-        self.hyperparams['L2_penalty'] = 0.1
-        self.network.set_hyperparams(self.hyperparams)
         L = len(units)
         # the number of ouput classifications
         class_num = units[L-1]
@@ -37,6 +35,25 @@ class GradientCheck:
         y = np.mod(np.arange(1,self.test_num+1),class_num)
         self.y = map.class2matrix(y)
 
+    def checks(self):
+        self.check_sigmoid()
+        self.check_softmax()
+
+    def check_sigmoid(self):
+        self.hyperparams['L2_penalty'] = 0.1
+        # check sigmoid relative
+        self.hyperparams['lossfunc'] = 'log_loss'
+        self.hyperparams['out_activation'] = 'sigmoid'
+        self.network.set_hyperparams(self.hyperparams)
+        self.check_gradient()
+
+    def check_softmax(self):
+        self.hyperparams['L2_penalty'] = 0.1
+        # check softmax relative
+        self.hyperparams['lossfunc'] = 'softmax_loss'
+        self.hyperparams['out_activation'] = 'softmax'
+        self.network.set_hyperparams(self.hyperparams)
+        self.check_gradient()
 
     def numerical_gradient_part(self,prefix):
         """
@@ -100,7 +117,7 @@ class GradientCheck:
         difference -- difference between the approximated gradient and the backward propagation gradient
 
         """
-
+        print('\nChecking %s ...' % (self.hyperparams['out_activation']))
         # calculate the gradient with two diffent ways
         grad1,_ = self.network.backward(self.X, self.y, params=self.params)
         grad2 = self.numerical_gradient()
