@@ -80,12 +80,16 @@ class OriginNeuralNetwork(Classifier):
         ``no_improve_num`` consecutive epochs.
         Only effective when solver='MBGD' or 'ADAM'
     momentum_beta : float, optional, default 0.9
-        The momentum hyperparameter for Momentum and NAG algorithms.
+        The momentum hyperparameter for Momentum/NAG/Adam algorithms.
         The larger the momentum β is, the smoother
         the update because the more we take the past gradients into account.
         But if β is too big, it could also smooth out the updates too much.
         Common values for β range from 0.8 to 0.999. If you don't feel inclined
         to tune this, β=0.9 is often a reasonable default.
+    rms_beta : float, optional, default 0.999
+        The hyperparameter for RMSprop/Adam algorithms.
+    epsilon : float, optional, default 1e-8
+        Value for numerical stability in RMSprop/Adam.
     """
 
     hyperparams = {}
@@ -110,7 +114,7 @@ class OriginNeuralNetwork(Classifier):
                  learning_rate_type='constant',learning_rate_init=0.01,
                  L2_penalty=0.01,max_iters=200, batch_size=64, tol=1e-4,
                  verbose=False, no_improve_num=10, early_stopping=False,
-                 momentum_beta=0.9):
+                 momentum_beta=0.9, rms_beta=0.99, epsilon=1e-8):
 
         self.layers = len(units)
 
@@ -130,7 +134,8 @@ class OriginNeuralNetwork(Classifier):
         self.hyperparams['no_improve_num'] = no_improve_num
         self.hyperparams['early_stopping'] = early_stopping
         self.hyperparams['momentum_beta'] = momentum_beta
-
+        self.hyperparams['rms_beta'] = rms_beta
+        self.hyperparams['epsilon'] = epsilon
 
     def get_hyperparams(self):
         """
@@ -462,6 +467,8 @@ class OriginNeuralNetwork(Classifier):
     def NAG(self, X, y):
         """
         Nesterov accelerated gradient
+        In this algorithm you'd better turn on the early_stopping
+        for the cost value is not the cost value we need
         """
         self.algorithm_init()
         X_test = None
@@ -502,8 +509,48 @@ class OriginNeuralNetwork(Classifier):
 
         return self.params
 
+    def RMSprop(self, X, y):
+        """
+        RMSprop algorithm
+        """
+        self.algorithm_init()
+        X_test = None
+        y_test = None
+        if self.hyperparams['early_stopping']:
+            X, y, X_test, y_test = train_test_split(X,y)
+        num = X.shape[1]
+        batch_size = self.hyperparams['batch_size']
+        learning_rate_init = self.hyperparams['learning_rate_init']
 
-    SOLVERS = {'BGD':BGD, 'MBGD':MBGD, 'Momentum':Momentum, 'NAG':NAG}
+        units = self.hyperparams['units']
+
+        sW = self.layers * [None]
+        sb = self.layers * [None]
+        for l in range(1,self.layers):
+            sW[l] = np.zeros((units[l], units[l-1]))
+            sb[l] = np.zeros((units[l], 1))
+        rms_beta = self.hyperparams['rms_beta']
+        epsilon = self.hyperparams['epsilon']
+        for self.iters_count in range(1,self.hyperparams['max_iters']+1):
+            costs_sum = 0.0
+            for batch_slice in gen_batches(num, batch_size):
+                grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
+                costs_sum += cost * (batch_slice.stop - batch_slice.start)
+                # update parameters with calculated gradients
+                for l in range(1,self.layers):
+                    sW[l] = rms_beta*sW[l] + (1-rms_beta)*grads['dW' + str(l)]**2
+                    sb[l] = rms_beta*sb[l] + (1-rms_beta)*grads['db' + str(l)]**2
+                    self.params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]/np.sqrt(sW[l]+epsilon)
+                    self.params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]/np.sqrt(sb[l]+epsilon)
+            self.costs.append(costs_sum / X.shape[1])
+            self.update_no_improve_count(X_test, y_test)
+            if self.trigger_stopping():
+                break
+
+        return self.params
+
+
+    SOLVERS = {'BGD':BGD, 'MBGD':MBGD, 'Momentum':Momentum, 'NAG':NAG, 'RMSprop':RMSprop }
 
 
     def fit(self, X, y):

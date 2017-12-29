@@ -118,7 +118,30 @@ def fitNAG(network,X,Y):
     hyperparams['learning_rate_init'] = 0.15
     hyperparams['batch_size'] = 512
     hyperparams['early_stopping'] = True
-    hyperparams['verbose'] = False
+    #hyperparams['verbose'] = False
+
+    network.set_hyperparams(hyperparams)
+    params = network.fit(X,Y)
+
+    # test forward propagation
+    accuracy = network.score(X,Y)
+    print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
+
+def fitRMSprop(network,X,Y):
+    hyperparams = {}
+    units = [400, 25, 10]
+    hyperparams['solver'] = 'RMSprop'
+    hyperparams['units'] = units
+    hyperparams['activation'] = 'relu'
+    hyperparams['out_activation'] = 'softmax'
+    hyperparams['lossfunc'] = 'softmax_loss'
+    hyperparams['L2_penalty'] = 1.0
+    hyperparams['max_iters'] = 200
+    hyperparams['tol'] = 0.0001
+    hyperparams['learning_rate_init'] = 0.01
+    hyperparams['batch_size'] = 512
+    hyperparams['early_stopping'] = True
+    #hyperparams['verbose'] = True
 
     network.set_hyperparams(hyperparams)
     params = network.fit(X,Y)
@@ -160,5 +183,6 @@ if __name__ == '__main__':
     #fitBGD(network,X,Y)
     #fitMBGD(network,X,Y)
     #fitMBGD2(network,X,Y)
-    fitMomentum(network,X,Y)
+    #fitMomentum(network,X,Y)
     fitNAG(network,X,Y)
+    fitRMSprop(network,X,Y)
