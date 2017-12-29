@@ -36,18 +36,16 @@ def accuracy_score(y_true, y_pred, normalize=True):
 
     # Compute accuracy for each possible representation
     check_consistent_length(y_true, y_pred)
-    if y_true.ndim == 1:
+    if y_true.ndim == 1 or y_true.shape[0] == 1 or y_true.shape[1] == 1:
         num = y_true.size
+        y_pred[y_pred >= 0.5] = 1
+        y_pred[y_pred < 0.5] = 0
         score = 1.0*np.sum(y_true == y_pred)
     else:
-        if y_true.shape[0] == 1 or y_true.shape[1] == 1:
-            num = y_true.size
-            score = 1.0*np.sum(y_true == y_pred)
-        else:
-            num = y_true.shape[1]
-            idx1 = np.argmax(y_true,axis=0)
-            idx2 = np.argmax(y_pred,axis=0)
-            score = 1.0*np.sum(idx1 == idx2)
+        num = y_true.shape[1]
+        idx1 = np.argmax(y_true,axis=0)
+        idx2 = np.argmax(y_pred,axis=0)
+        score = 1.0*np.sum(idx1 == idx2)
     if normalize:
         score = 1.0*score / num
 
