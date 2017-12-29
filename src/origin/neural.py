@@ -79,6 +79,13 @@ class OriginNeuralNetwork(Classifier):
         validation score is not improving by at least tol for
         ``no_improve_num`` consecutive epochs.
         Only effective when solver='MBGD' or 'ADAM'
+    momentum_beta : float, optional, default 0.9
+        The momentum hyperparameter for Momentum and NAG algorithms.
+        The larger the momentum β is, the smoother
+        the update because the more we take the past gradients into account.
+        But if β is too big, it could also smooth out the updates too much.
+        Common values for β range from 0.8 to 0.999. If you don't feel inclined
+        to tune this, β=0.9 is often a reasonable default.
     """
 
     hyperparams = {}
@@ -400,6 +407,18 @@ class OriginNeuralNetwork(Classifier):
     def Momentum(self, X, y):
         """
         Momentum gradient gradient descent
+          Because mini-batch gradient descent makes a parameter update
+        after seeing just a subset of examples, the direction of the
+        update has some variance, and so the path taken by mini-batch
+        gradient descent will "oscillate" toward convergence. Using
+        momentum can reduce these oscillations.
+          Momentum takes into account the past gradients to smooth out
+        the update. We will store the 'direction' of the previous gradients
+        in the variable vv. Formally, this will be the exponentially
+        weighted average of the gradient on previous steps. You can also
+        think of vv as the "velocity" of a ball rolling downhill,
+        building up speed (and momentum) according to the direction of
+        the gradient/slope of the hill.
         """
         self.algorithm_init()
         X_test = None
@@ -426,8 +445,11 @@ class OriginNeuralNetwork(Classifier):
                 costs_sum += cost * (batch_slice.stop - batch_slice.start)
                 # update parameters with calculated gradients
                 for l in range(1,self.layers):
-                    momentumW[l] = moment_beta*momentumW[l] + (1-moment_beta)*grads['dW' + str(l)]
-                    momentumb[l] = moment_beta*momentumb[l] + (1-moment_beta)*grads['db' + str(l)]
+                    # These two methods to update momentum are correct, they work well on different learning rate
+                    #momentumW[l] = moment_beta*momentumW[l] + (1-moment_beta)*grads['dW' + str(l)]
+                    #momentumb[l] = moment_beta*momentumb[l] + (1-moment_beta)*grads['db' + str(l)]
+                    momentumW[l] = moment_beta*momentumW[l] + grads['dW' + str(l)]
+                    momentumb[l] = moment_beta*momentumb[l] + grads['db' + str(l)]
                     self.params['W' + str(l)] -= learning_rate_init * momentumW[l]
                     self.params['b' + str(l)] -= learning_rate_init * momentumb[l]
             self.costs.append(costs_sum / X.shape[1])
@@ -437,7 +459,51 @@ class OriginNeuralNetwork(Classifier):
 
         return self.params
 
-    SOLVERS = {'BGD':BGD, 'MBGD':MBGD, 'Momentum':Momentum}
+    def NAG(self, X, y):
+        """
+        Nesterov accelerated gradient
+        """
+        self.algorithm_init()
+        X_test = None
+        y_test = None
+        if self.hyperparams['early_stopping']:
+            X, y, X_test, y_test = train_test_split(X,y)
+        num = X.shape[1]
+        batch_size = self.hyperparams['batch_size']
+        learning_rate_init = self.hyperparams['learning_rate_init']
+
+        units = self.hyperparams['units']
+
+        momentumW = self.layers * [None]
+        momentumb = self.layers * [None]
+        for l in range(1,self.layers):
+            momentumW[l] = np.zeros((units[l], units[l-1]))
+            momentumb[l] = np.zeros((units[l], 1))
+
+        moment_beta = self.hyperparams['momentum_beta']
+        for self.iters_count in range(1,self.hyperparams['max_iters']+1):
+            costs_sum = 0.0
+            for batch_slice in gen_batches(num, batch_size):
+                for l in range(1,self.layers):
+                    self.params['W' + str(l)] -= learning_rate_init * moment_beta * momentumW[l]
+                    self.params['b' + str(l)] -= learning_rate_init * moment_beta * momentumb[l]
+                grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
+                costs_sum += cost * (batch_slice.stop - batch_slice.start)
+                # update parameters with calculated gradients
+                for l in range(1,self.layers):
+                    momentumW[l] = moment_beta*momentumW[l] + grads['dW' + str(l)]
+                    momentumb[l] = moment_beta*momentumb[l] + grads['db' + str(l)]
+                    self.params['W' + str(l)] -= learning_rate_init * momentumW[l]
+                    self.params['b' + str(l)] -= learning_rate_init * momentumb[l]
+            self.costs.append(costs_sum / X.shape[1])
+            self.update_no_improve_count(X_test, y_test)
+            if self.trigger_stopping():
+                break
+
+        return self.params
+
+
+    SOLVERS = {'BGD':BGD, 'MBGD':MBGD, 'Momentum':Momentum, 'NAG':NAG}
 
 
     def fit(self, X, y):
