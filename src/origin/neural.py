@@ -193,12 +193,18 @@ class OriginNeuralNetwork(Classifier):
         # activation function
         activation = self.hyperparams['activation']
         out_activation = self.hyperparams['out_activation']
-        cache={}
+        # cache[0] is cached Z of each layer
+        # cache[1] is cached A of each layer
+        cache = 2*[np.array(self.layers*[None])]
+        cache = np.array(cache)
+
+        cache[0,0] = X
+        cache[1,0] = X
+
         A = X
-        cache['A0'] = A
         for l in range(1, self.layers):
-            W = self.params['W' + str(l)]
-            b = self.params['b' + str(l)]
+            W = self.params[0,l]
+            b = self.params[1,l]
             Z = np.dot(W, A) + b
             # the media layer
             if l != self.layers - 1:
@@ -216,8 +222,8 @@ class OriginNeuralNetwork(Classifier):
                     A = sigmoid(Z)
                 else:
                     raise ValueError('No such out activation: %s' % (activation))
-            cache['Z'+str(l)] = Z
-            cache['A'+str(l)] = A
+            cache[0,l] = Z
+            cache[1,l] = A
 
         return A, cache
 
@@ -258,18 +264,20 @@ class OriginNeuralNetwork(Classifier):
         activation = self.hyperparams['activation']
         out_activation = self.hyperparams['out_activation']
         L2_penalty = self.hyperparams['L2_penalty']
-        gradients = {}
+        gradients = 2*[np.array(self.layers*[None])]
+        gradients = np.array(gradients)
+        gradients[0,0] = gradients[1,0] = np.array([])
         for l in range(self.layers-1,0,-1):
-            Z = cache['Z'+str(l)]
-            A = cache['A'+str(l-1)]
+            Z = cache[0,l]
+            A = cache[1,l-1]
             if l == self.layers-1 :
                 dZ = Al - y
                 dW = 1./m * np.dot(dZ, A.T)
                 db = 1./m * np.sum(dZ, axis=1, keepdims = True)
             else:
                 # use W in previous layer
-                Wp = self.params['W'+str(l+1)]
-                # use calculated dZ in previous layer
+                Wp = self.params[0,l+1]
+                # use calculated dZ calculate in the previous iteration
                 dA = np.dot(Wp.T, dZ)
                 if activation == 'relu':
                     # np.int64(A > 0) is the gradient of ReLU
@@ -284,11 +292,10 @@ class OriginNeuralNetwork(Classifier):
                 db = 1./m * np.sum(dZ, axis=1, keepdims = True)
 
             # add regularition item
-            dW += 1.0*L2_penalty/m * self.params['W'+str(l)]
+            dW += 1.0*L2_penalty/m * self.params[0,l]
 
-            gradients['dZ'+str(l)] = dZ
-            gradients['dW'+str(l)] = dW
-            gradients['db'+str(l)] = db
+            gradients[0,l] = dW
+            gradients[1,l] = db
 
         return gradients, cost
 
@@ -311,6 +318,8 @@ class OriginNeuralNetwork(Classifier):
             if last_valid_score > self.best_validation_score:
                 self.best_validation_score = last_valid_score
         else:
+            if self.hyperparams['verbose']:
+                print("Cost value: %f" % (self.costs[-1]) )
             if self.costs[-1] > self.best_cost - self.hyperparams['tol']:
                 self.no_improve_count += 1
             else:
@@ -370,10 +379,9 @@ class OriginNeuralNetwork(Classifier):
         for self.iters_count in range(1,self.hyperparams['max_iters']+1):
             grads, cost = self.backward(X,y)
             self.costs.append(cost)
+            print(self.params[0,0].shape,grads[0,0].shape)
             # update parameters with calculated gradients
-            for l in range(1,self.layers):
-                self.params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
-                self.params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]
+            self.params -= learning_rate_init * grads
             self.update_no_improve_count()
             if self.trigger_stopping():
                 break
@@ -399,8 +407,8 @@ class OriginNeuralNetwork(Classifier):
                 costs_sum += cost * (batch_slice.stop - batch_slice.start)
                 # update parameters with calculated gradients
                 for l in range(1,self.layers):
-                    self.params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]
-                    self.params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]
+                    self.params[l] -= learning_rate_init * grads['dW' + str(l)]
+                    self.params[l] -= learning_rate_init * grads['db' + str(l)]
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():
@@ -455,8 +463,8 @@ class OriginNeuralNetwork(Classifier):
                     #momentumb[l] = moment_beta*momentumb[l] + (1-moment_beta)*grads['db' + str(l)]
                     momentumW[l] = moment_beta*momentumW[l] + grads['dW' + str(l)]
                     momentumb[l] = moment_beta*momentumb[l] + grads['db' + str(l)]
-                    self.params['W' + str(l)] -= learning_rate_init * momentumW[l]
-                    self.params['b' + str(l)] -= learning_rate_init * momentumb[l]
+                    self.params[l] -= learning_rate_init * momentumW[l]
+                    self.params[l] -= learning_rate_init * momentumb[l]
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():
@@ -492,16 +500,16 @@ class OriginNeuralNetwork(Classifier):
             costs_sum = 0.0
             for batch_slice in gen_batches(num, batch_size):
                 for l in range(1,self.layers):
-                    self.params['W' + str(l)] -= learning_rate_init * moment_beta * momentumW[l]
-                    self.params['b' + str(l)] -= learning_rate_init * moment_beta * momentumb[l]
+                    self.params[l] -= learning_rate_init * moment_beta * momentumW[l]
+                    self.params[l] -= learning_rate_init * moment_beta * momentumb[l]
                 grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
                 costs_sum += cost * (batch_slice.stop - batch_slice.start)
                 # update parameters with calculated gradients
                 for l in range(1,self.layers):
                     momentumW[l] = moment_beta*momentumW[l] + grads['dW' + str(l)]
                     momentumb[l] = moment_beta*momentumb[l] + grads['db' + str(l)]
-                    self.params['W' + str(l)] -= learning_rate_init * momentumW[l]
-                    self.params['b' + str(l)] -= learning_rate_init * momentumb[l]
+                    self.params[l] -= learning_rate_init * momentumW[l]
+                    self.params[l] -= learning_rate_init * momentumb[l]
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():
@@ -543,8 +551,8 @@ class OriginNeuralNetwork(Classifier):
                     # bias correct
                     corsW = sW[l] / (1. - np.power(rms_beta,self.iters_count))
                     corsb = sb[l] / (1. - np.power(rms_beta,self.iters_count))
-                    self.params['W' + str(l)] -= learning_rate_init * grads['dW' + str(l)]/np.sqrt(corsW+epsilon)
-                    self.params['b' + str(l)] -= learning_rate_init * grads['db' + str(l)]/np.sqrt(corsb+epsilon)
+                    self.params[l] -= learning_rate_init * grads['dW' + str(l)]/np.sqrt(corsW+epsilon)
+                    self.params[l] -= learning_rate_init * grads['db' + str(l)]/np.sqrt(corsb+epsilon)
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():
@@ -598,8 +606,8 @@ class OriginNeuralNetwork(Classifier):
                     corsW = sW[l] / (1. - np.power(rms_beta,self.iters_count))
                     corsb = sb[l] / (1. - np.power(rms_beta,self.iters_count))
                     # update parameters
-                    self.params['W' + str(l)] -= learning_rate_init * cormW/np.sqrt(corsW+epsilon)
-                    self.params['b' + str(l)] -= learning_rate_init * cormb/np.sqrt(corsb+epsilon)
+                    self.params[l] -= learning_rate_init * cormW/np.sqrt(corsW+epsilon)
+                    self.params[l] -= learning_rate_init * cormb/np.sqrt(corsb+epsilon)
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():

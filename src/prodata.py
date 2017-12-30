@@ -32,13 +32,15 @@ def debug_init_params(units):
         Wl -- weight matrix of shape (layer_dims[l], layer_dims[l-1])
         bl -- bias vector of shape (layer_dims[l], 1)
     """
-    params = {}
+    params = 2*[np.array(len(units)*[None])]
+    params = np.array(params)
+
     for i in np.arange(1,len(units)):
         lin = units[i-1]
         lout = units[i]
         W,b = debug_init_unit(lin,lout)
-        params['W'+str(i)] = W
-        params['b'+str(i)] = b
+        params[0,i] = W
+        params[1,i] = b
 
     return params
 
@@ -61,13 +63,14 @@ def init_params(units):
     """
 
     np.random.seed(3)
-    params = {}
+    params = 2*[np.array(len(units)*[None])]
+    params = np.array(params)
     # number of layers in the network
     L = len(units) 
-
-    for l in range(1, L):
-        params['W' + str(l)] = np.random.randn(units[l], units[l-1]) / np.sqrt(units[l-1])
-        params['b' + str(l)] = np.zeros((units[l], 1))
+    params[0,0] = params[1,0]= np.array([])
+    for l in range(0, L):
+        params[0,l] = np.random.randn(units[l], units[l-1]) / np.sqrt(units[l-1])
+        params[1,l] = np.zeros((units[l], 1))
 
     return params
 
@@ -112,16 +115,11 @@ def normdiff(dict1, dict2, prefix=None):
     """
     calculate the norm of the difference of two dataset
     """
-    if prefix != None:
-        dict1 = extract(dict1,prefix)
-        dict2 = extract(dict2,prefix)
-
     flat1 = np.array([])
     flat2 = np.array([])
-
-    for key in dict1.keys():
-        flat1 = np.hstack((flat1,dict1[key].flatten()))
-        flat2 = np.hstack((flat2,dict2[key].flatten()))
+    for l in range(1,len(dict1[prefix])):
+        flat1 = np.hstack((flat1,dict1[prefix,l].flatten()))
+        flat2 = np.hstack((flat2,dict2[prefix,l].flatten()))
 
     diff = norm(flat1 - flat2)/norm(flat1 + flat2)
 

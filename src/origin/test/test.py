@@ -9,12 +9,10 @@ from check import GradientCheck
 from score import accuracy_score
 
 def load_params(fpath):
-    params = {}
     data = np.load(fpath)
-    params['b1'] = data['b1']
-    params['W1'] = data['W1']
-    params['b2'] = data['b2']
-    params['W2'] = data['W2']
+    W = np.array([np.array([]),data['W1'],data['W2']])
+    b = np.array([np.array([]),data['b1'],data['b2']])
+    params = np.array([W,b])
 
     return params
 
@@ -30,6 +28,8 @@ def fitBGD(network,X,Y):
     hyperparams['tol'] = 0.001
     hyperparams['max_iters'] = 500
     hyperparams['learning_rate_init'] = 0.2
+    hyperparams['verbose'] = True
+    hyperparams['no_improve_num'] = 10
 
     network.set_hyperparams(hyperparams)
     params = network.fit(X,Y)
@@ -195,6 +195,7 @@ if __name__ == '__main__':
     # test cost function
     cost = compute_cost(params,hyperparams,Y,y_prob)
     print('The cost value on test data is: ',cost)
+
     # test forward propagation
     accuracy = network.score(X,Y)
     print ('The accuracy on hand-written digit dataset is: {}%'.format( accuracy * 100 ))
@@ -202,11 +203,12 @@ if __name__ == '__main__':
     # check backward propagation
     check = GradientCheck(network)
     check.checks()
-
-    #fitBGD(network,X,Y)
+    fitBGD(network,X,Y)
+    """
     #fitMBGD(network,X,Y)
     #fitMBGD2(network,X,Y)
     fitMomentum(network,X,Y)
     fitNAG(network,X,Y)
     fitRMSprop(network,X,Y)
     fitAdam(network,X,Y)
+    """

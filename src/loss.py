@@ -104,10 +104,8 @@ def compute_cost(params, hyperparams, y_true, y_prob):
 
     regular = 0
     for l in range(1,L):
-        W = params['W' + str(l)]
-        b = params['b' + str(l)]
-        regular += np.sum(W * W)
-
+        W = params[0,l]
+        regular += np.sum(W ** 2)
     J += L2_penalty/(2.0*m)*regular
 
     return J

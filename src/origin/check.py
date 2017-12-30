@@ -55,33 +55,6 @@ class GradientCheck:
         self.network.set_hyperparams(self.hyperparams)
         self.check_gradient()
 
-    def numerical_gradient_part(self,prefix):
-        """
-        compute numerical gradient of parameter specified with prefix
-        """
-        check = 1e-4
-        grads={}
-        units = self.hyperparams['units']
-        for l in range(1,len(units)):
-            value = self.params[prefix+str(l)]
-            m,n = value.shape
-            dTmp = np.zeros((m,n))
-            for i in range(0,m):
-                for j in range(0,n):
-                    tmp = value[i,j]
-                    value[i,j] = tmp + check
-                    y_prob,_ = self.network.forward(self.X, params=self.params)
-                    up = compute_cost(self.params, self.hyperparams, self.y, y_prob)
-                    value[i,j] = tmp - check
-                    self.network.set_params(self.params)
-                    y_prob,_ = self.network.forward(self.X, params=self.params)
-                    down = compute_cost(self.params, self.hyperparams, self.y, y_prob)
-                    dTmp[i,j] = (up - down)/(2.0*check)
-                    value[i,j] = tmp
-            grads['d'+prefix+str(l)] = dTmp
-
-        return grads
-
     def numerical_gradient(self):
         """
         Compute all the numerical gradients of parameters in cost function
@@ -96,15 +69,30 @@ class GradientCheck:
         grads -- numerical gradients of the cost function
 
         """
-        # compute numerical gradient of parameter W
-        gradW = self.numerical_gradient_part('W')
-        # compute numerical gradient of parameter b
-        gradb = self.numerical_gradient_part('b')
-        # merge the two parts of the gradient
-        grads = dict(gradW,**gradb)
-
+        check = 1e-4
+        units = self.hyperparams['units']
+        grads=2*[np.array(len(units)*[None])]
+        grads = np.array(grads)
+        for prefix in range(0,2):
+            for l in range(1,len(units)):
+                value = self.params[prefix,l]
+                m,n = value.shape
+                dTmp = np.zeros((m,n))
+                for i in range(0,m):
+                    for j in range(0,n):
+                        tmp = value[i,j]
+                        value[i,j] = tmp + check
+                        y_prob,_ = self.network.forward(self.X, params=self.params)
+                        up = compute_cost(self.params, self.hyperparams, self.y, y_prob)
+                        value[i,j] = tmp - check
+                        self.network.set_params(self.params)
+                        y_prob,_ = self.network.forward(self.X, params=self.params)
+                        down = compute_cost(self.params, self.hyperparams, self.y, y_prob)
+                        dTmp[i,j] = (up - down)/(2.0*check)
+                        # reset to the original value
+                        value[i,j] = tmp
+                grads[prefix,l] = dTmp
         return grads
-
 
     def check_gradient(self):
         """
@@ -123,11 +111,11 @@ class GradientCheck:
         grad2 = self.numerical_gradient()
 
         # calculate the norm of the difference of two kinds of W
-        diffW = normdiff(grad1,grad2,prefix='dW')
+        diffW = normdiff(grad1,grad2,prefix=0)
         print ("Evaluate the norm of the difference between two dW: %e" % (diffW))
 
         # calculate the norm of the difference of two kinds of b
-        diffb = normdiff(grad1,grad2,prefix='db')
+        diffb = normdiff(grad1,grad2,prefix=1)
         print ("Evaluate the norm of the difference between two db: %e" % (diffb))
 
         res = ( diffW < self.deadline ) and ( diffb < self.deadline )
