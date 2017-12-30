@@ -388,35 +388,6 @@ class OriginNeuralNetwork(Classifier):
 
         return self.params
 
-    def MBGD(self, X, y):
-        """
-        Mini batch gradient descent
-        """
-        self.algorithm_init()
-        X_test = None
-        y_test = None
-        if self.hyperparams['early_stopping']:
-            X, y, X_test, y_test = train_test_split(X,y)
-        num = X.shape[1]
-        batch_size = self.hyperparams['batch_size']
-        learning_rate_init = self.hyperparams['learning_rate_init']
-        for self.iters_count in range(1,self.hyperparams['max_iters']+1):
-            costs_sum = 0.0
-            for batch_slice in gen_batches(num, batch_size):
-                grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
-                costs_sum += cost * (batch_slice.stop - batch_slice.start)
-                # update parameters with calculated gradients
-                for l in range(1,self.layers):
-                    self.params[l] -= learning_rate_init * grads['dW' + str(l)]
-                    self.params[l] -= learning_rate_init * grads['db' + str(l)]
-            self.costs.append(costs_sum / X.shape[1])
-            self.update_no_improve_count(X_test, y_test)
-            if self.trigger_stopping():
-                break
-
-        return self.params
-
-
     def Momentum(self, X, y):
         """
         Momentum gradient gradient descent
