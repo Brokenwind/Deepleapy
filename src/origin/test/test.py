@@ -25,10 +25,10 @@ def fitBGD(network,X,Y):
     hyperparams['activation'] = 'relu'
     hyperparams['out_activation'] = 'sigmoid'
     hyperparams['L2_penalty'] = 1.0
-    hyperparams['tol'] = 0.001
+    hyperparams['tol'] = 0.01
     hyperparams['max_iters'] = 500
-    hyperparams['learning_rate_init'] = 0.2
-    hyperparams['verbose'] = True
+    hyperparams['learning_rate_init'] = 0.5
+    hyperparams['verbose'] = False
     hyperparams['no_improve_num'] = 10
 
     network.set_hyperparams(hyperparams)
@@ -203,12 +203,10 @@ if __name__ == '__main__':
     # check backward propagation
     check = GradientCheck(network)
     check.checks()
-    fitBGD(network,X,Y)
-    """
+    #fitBGD(network,X,Y)
     #fitMBGD(network,X,Y)
     #fitMBGD2(network,X,Y)
     fitMomentum(network,X,Y)
     fitNAG(network,X,Y)
-    fitRMSprop(network,X,Y)
+    #fitRMSprop(network,X,Y)
     fitAdam(network,X,Y)
-    """

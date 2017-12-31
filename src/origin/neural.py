@@ -195,9 +195,7 @@ class OriginNeuralNetwork(Classifier):
         out_activation = self.hyperparams['out_activation']
         # cache[0] is cached Z of each layer
         # cache[1] is cached A of each layer
-        cache = 2*[np.array(self.layers*[None])]
-        cache = np.array(cache)
-
+        cache = init_empty(2,self.layers)
         cache[0,0] = X
         cache[1,0] = X
 
@@ -264,9 +262,7 @@ class OriginNeuralNetwork(Classifier):
         activation = self.hyperparams['activation']
         out_activation = self.hyperparams['out_activation']
         L2_penalty = self.hyperparams['L2_penalty']
-        gradients = 2*[np.array(self.layers*[None])]
-        gradients = np.array(gradients)
-        gradients[0,0] = gradients[1,0] = np.array([])
+        gradients = init_empty(2,self.layers)
         for l in range(self.layers-1,0,-1):
             Z = cache[0,l]
             A = cache[1,l-1]
@@ -379,7 +375,6 @@ class OriginNeuralNetwork(Classifier):
         for self.iters_count in range(1,self.hyperparams['max_iters']+1):
             grads, cost = self.backward(X,y)
             self.costs.append(cost)
-            print(self.params[0,0].shape,grads[0,0].shape)
             # update parameters with calculated gradients
             self.params -= learning_rate_init * grads
             self.update_no_improve_count()
@@ -387,6 +382,33 @@ class OriginNeuralNetwork(Classifier):
                 break
 
         return self.params
+
+    def MBGD(self, X, y):
+        """
+        Mini batch gradient descent
+        """
+        self.algorithm_init()
+        X_test = None
+        y_test = None
+        if self.hyperparams['early_stopping']:
+            X, y, X_test, y_test = train_test_split(X,y)
+        num = X.shape[1]
+        batch_size = self.hyperparams['batch_size']
+        learning_rate_init = self.hyperparams['learning_rate_init']
+        for self.iters_count in range(1,self.hyperparams['max_iters']+1):
+            costs_sum = 0.0
+            for batch_slice in gen_batches(num, batch_size):
+                grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
+                costs_sum += cost * (batch_slice.stop - batch_slice.start)
+                # update parameters with calculated gradients
+                self.params -= learning_rate_init * grads
+            self.costs.append(costs_sum / X.shape[1])
+            self.update_no_improve_count(X_test, y_test)
+            if self.trigger_stopping():
+                break
+
+        return self.params
+
 
     def Momentum(self, X, y):
         """
@@ -415,11 +437,10 @@ class OriginNeuralNetwork(Classifier):
 
         units = self.hyperparams['units']
 
-        momentumW = self.layers * [None]
-        momentumb = self.layers * [None]
+        momentum = init_empty(2,self.layers)
         for l in range(1,self.layers):
-            momentumW[l] = np.zeros((units[l], units[l-1]))
-            momentumb[l] = np.zeros((units[l], 1))
+            momentum[0,l] = np.zeros((units[l], units[l-1]))
+            momentum[1,l] = np.zeros((units[l], 1))
 
         moment_beta = self.hyperparams['momentum_beta']
         for self.iters_count in range(1,self.hyperparams['max_iters']+1):
@@ -428,14 +449,8 @@ class OriginNeuralNetwork(Classifier):
                 grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
                 costs_sum += cost * (batch_slice.stop - batch_slice.start)
                 # update parameters with calculated gradients
-                for l in range(1,self.layers):
-                    # These two methods to update momentum are correct, they work well on different learning rate
-                    #momentumW[l] = moment_beta*momentumW[l] + (1-moment_beta)*grads['dW' + str(l)]
-                    #momentumb[l] = moment_beta*momentumb[l] + (1-moment_beta)*grads['db' + str(l)]
-                    momentumW[l] = moment_beta*momentumW[l] + grads['dW' + str(l)]
-                    momentumb[l] = moment_beta*momentumb[l] + grads['db' + str(l)]
-                    self.params[l] -= learning_rate_init * momentumW[l]
-                    self.params[l] -= learning_rate_init * momentumb[l]
+                momentum = moment_beta*momentum + grads
+                self.params -= learning_rate_init * momentum
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():
@@ -460,27 +475,20 @@ class OriginNeuralNetwork(Classifier):
 
         units = self.hyperparams['units']
 
-        momentumW = self.layers * [None]
-        momentumb = self.layers * [None]
+        momentum = init_empty(2,self.layers)
         for l in range(1,self.layers):
-            momentumW[l] = np.zeros((units[l], units[l-1]))
-            momentumb[l] = np.zeros((units[l], 1))
-
+            momentum[0,l] = np.zeros((units[l], units[l-1]))
+            momentum[1,l] = np.zeros((units[l], 1))
         moment_beta = self.hyperparams['momentum_beta']
         for self.iters_count in range(1,self.hyperparams['max_iters']+1):
             costs_sum = 0.0
             for batch_slice in gen_batches(num, batch_size):
-                for l in range(1,self.layers):
-                    self.params[l] -= learning_rate_init * moment_beta * momentumW[l]
-                    self.params[l] -= learning_rate_init * moment_beta * momentumb[l]
+                self.params -= learning_rate_init * moment_beta * momentum
                 grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
                 costs_sum += cost * (batch_slice.stop - batch_slice.start)
                 # update parameters with calculated gradients
-                for l in range(1,self.layers):
-                    momentumW[l] = moment_beta*momentumW[l] + grads['dW' + str(l)]
-                    momentumb[l] = moment_beta*momentumb[l] + grads['db' + str(l)]
-                    self.params[l] -= learning_rate_init * momentumW[l]
-                    self.params[l] -= learning_rate_init * momentumb[l]
+                momentum = moment_beta*momentum + grads
+                self.params -= learning_rate_init * momentum
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():
@@ -502,12 +510,10 @@ class OriginNeuralNetwork(Classifier):
         learning_rate_init = self.hyperparams['learning_rate_init']
 
         units = self.hyperparams['units']
-
-        sW = self.layers * [None]
-        sb = self.layers * [None]
+        squre = init_empty(2,self.layers)
         for l in range(1,self.layers):
-            sW[l] = np.zeros((units[l], units[l-1]))
-            sb[l] = np.zeros((units[l], 1))
+            squre[0,l] = np.zeros((units[l], units[l-1]))
+            squre[1,l] = np.zeros((units[l], 1))
         rms_beta = self.hyperparams['rms_beta']
         epsilon = self.hyperparams['epsilon']
         for self.iters_count in range(1,self.hyperparams['max_iters']+1):
@@ -516,14 +522,9 @@ class OriginNeuralNetwork(Classifier):
                 grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
                 costs_sum += cost * (batch_slice.stop - batch_slice.start)
                 # update parameters with calculated gradients
-                for l in range(1,self.layers):
-                    sW[l] = rms_beta*sW[l] + (1-rms_beta)*grads['dW' + str(l)]**2
-                    sb[l] = rms_beta*sb[l] + (1-rms_beta)*grads['db' + str(l)]**2
-                    # bias correct
-                    corsW = sW[l] / (1. - np.power(rms_beta,self.iters_count))
-                    corsb = sb[l] / (1. - np.power(rms_beta,self.iters_count))
-                    self.params[l] -= learning_rate_init * grads['dW' + str(l)]/np.sqrt(corsW+epsilon)
-                    self.params[l] -= learning_rate_init * grads['db' + str(l)]/np.sqrt(corsb+epsilon)
+                squre = rms_beta*squre + (1-rms_beta)*grads**2
+                corr = squre / (1. - np.power(rms_beta,self.iters_count))
+                self.params -= learning_rate_init * grads/(corr+epsilon)**0.5
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():
@@ -545,18 +546,14 @@ class OriginNeuralNetwork(Classifier):
         learning_rate_init = self.hyperparams['learning_rate_init']
 
         units = self.hyperparams['units']
-
-        momentumW = self.layers * [None]
-        momentumb = self.layers * [None]
-        sW = self.layers * [None]
-        sb = self.layers * [None]
+        momentum = init_empty(2,self.layers)
+        squre = init_empty(2,self.layers)
 
         for l in range(1,self.layers):
-            momentumW[l] = np.zeros((units[l], units[l-1]))
-            momentumb[l] = np.zeros((units[l], 1))
-            sW[l] = np.zeros((units[l], units[l-1]))
-            sb[l] = np.zeros((units[l], 1))
-
+            momentum[0,l] = np.zeros((units[l], units[l-1]))
+            momentum[1,l] = np.zeros((units[l], 1))
+            squre[0,l] = np.zeros((units[l], units[l-1]))
+            squre[1,l] = np.zeros((units[l], 1))
         rms_beta = self.hyperparams['rms_beta']
         moment_beta = self.hyperparams['momentum_beta']
         epsilon = self.hyperparams['epsilon']
@@ -565,20 +562,11 @@ class OriginNeuralNetwork(Classifier):
             for batch_slice in gen_batches(num, batch_size):
                 grads, cost = self.backward(X[:,batch_slice],y[:,batch_slice])
                 costs_sum += cost * (batch_slice.stop - batch_slice.start)
-                for l in range(1,self.layers):
-                    momentumW[l] = moment_beta*momentumW[l] + (1-moment_beta)*grads['dW' + str(l)]
-                    momentumb[l] = moment_beta*momentumb[l] + (1-moment_beta)*grads['db' + str(l)]
-                    # bias correct
-                    cormW = momentumW[l] / (1. - np.power(moment_beta,self.iters_count))
-                    cormb = momentumb[l] / (1. - np.power(moment_beta,self.iters_count))
-                    sW[l] = rms_beta*sW[l] + (1-rms_beta)*grads['dW' + str(l)]**2
-                    sb[l] = rms_beta*sb[l] + (1-rms_beta)*grads['db' + str(l)]**2
-                    # bias correct
-                    corsW = sW[l] / (1. - np.power(rms_beta,self.iters_count))
-                    corsb = sb[l] / (1. - np.power(rms_beta,self.iters_count))
-                    # update parameters
-                    self.params[l] -= learning_rate_init * cormW/np.sqrt(corsW+epsilon)
-                    self.params[l] -= learning_rate_init * cormb/np.sqrt(corsb+epsilon)
+                momentum = moment_beta*momentum + (1-moment_beta)*grads
+                corrM = momentum / (1. - np.power(moment_beta,self.iters_count))
+                squre = rms_beta*squre + (1-rms_beta)*grads**2
+                corrS = squre / (1. - np.power(rms_beta,self.iters_count))
+                self.params -= learning_rate_init * corrM/(corrS+epsilon)**0.5
             self.costs.append(costs_sum / X.shape[1])
             self.update_no_improve_count(X_test, y_test)
             if self.trigger_stopping():

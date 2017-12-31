@@ -111,14 +111,12 @@ class GradientCheck:
         grad2 = self.numerical_gradient()
 
         # calculate the norm of the difference of two kinds of W
-        diffW = normdiff(grad1,grad2,prefix=0)
-        print ("Evaluate the norm of the difference between two dW: %e" % (diffW))
-
+        diff = normdiff(grad1,grad2)
+        print ("Evaluate the norm of the difference between two dW: %e" % (diff[0]))
         # calculate the norm of the difference of two kinds of b
-        diffb = normdiff(grad1,grad2,prefix=1)
-        print ("Evaluate the norm of the difference between two db: %e" % (diffb))
+        print ("Evaluate the norm of the difference between two db: %e" % (diff[1]))
 
-        res = ( diffW < self.deadline ) and ( diffb < self.deadline )
+        res = ( diff[0] < self.deadline ) and ( diff[1] < self.deadline )
         if ( res ):
             print ("Passed the gradient check!")
         else:

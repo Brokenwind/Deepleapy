@@ -2,6 +2,17 @@ import numpy as np
 import re
 from numpy.linalg import norm
 
+def init_empty(row, col):
+    """
+    Initialize a 2D array whose all the elements are np.ndarray
+    """
+    params = row*[np.array(col*[None])]
+    params = np.array(params)
+    # the first col need specical initialization
+    for i in range(0, row):
+        params[i,0] = np.array([])
+    return params
+
 def debug_init_unit(lin,lout):
     """
     Initialize the weights of a layer with lin incoming connections and 
@@ -63,12 +74,9 @@ def init_params(units):
     """
 
     np.random.seed(3)
-    params = 2*[np.array(len(units)*[None])]
-    params = np.array(params)
-    # number of layers in the network
     L = len(units) 
-    params[0,0] = params[1,0]= np.array([])
-    for l in range(0, L):
+    params = init_empty(2,len(units))
+    for l in range(1, L):
         params[0,l] = np.random.randn(units[l], units[l-1]) / np.sqrt(units[l-1])
         params[1,l] = np.zeros((units[l], 1))
 
@@ -111,17 +119,22 @@ def extract(params,prefix):
 
     return res
 
-def normdiff(dict1, dict2, prefix=None):
+def normdiff(grad1, grad2):
     """
     calculate the norm of the difference of two dataset
     """
-    flat1 = np.array([])
-    flat2 = np.array([])
-    for l in range(1,len(dict1[prefix])):
-        flat1 = np.hstack((flat1,dict1[prefix,l].flatten()))
-        flat2 = np.hstack((flat2,dict2[prefix,l].flatten()))
+    if grad1.shape != grad2.shape:
+        raise ValueError('The input grad1 and grad2 is not consistent')
+    num = len(grad1)
+    diff = np.array(num * [0.])
+    for i in range(0,num):
+        flat1 = np.array([])
+        flat2 = np.array([])
+        for l in range(1,len(grad1[i])):
+            flat1 = np.hstack((flat1,grad1[i,l].flatten()))
+            flat2 = np.hstack((flat2,grad2[i,l].flatten()))
 
-    diff = norm(flat1 - flat2)/norm(flat1 + flat2)
+        diff[i] = norm(flat1 - flat2)/norm(flat1 + flat2)
 
     return diff
 
