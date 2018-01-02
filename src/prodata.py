@@ -206,3 +206,44 @@ def train_test_split(X, y, **options):
     test_num = int(y.shape[1] * 0.25)
 
     return X[:,test_num:], y[:,test_num:], X[:,0:test_num], y[:,0:test_num]
+
+def zero_pad(X,pad):
+    """
+    Pad with zeros all images of the dataset X. The padding is applied to
+    the height and width of an image
+    Parameters
+    ----------
+    X : python numpy array of shape (m, n_H, n_W, n_C)
+        representing a batch of m images
+    pad : integer
+        amount of padding around each image on vertical and horizontal dimensions
+
+    Returns:
+    -------
+        padded image of shape (m, n_H + 2*pad, n_W + 2*pad, n_C)
+    """
+    np.pad(X, ((pad, pad),(pad, pad)), 'constant',constant_values=(0,0))
+
+def conv(X,W,b,stride=1):
+    """
+    Apply one filter defined by parameters W on a single slice (a_slice_prev)
+    of the output activation of the previous layer.
+    Parameters
+    ----------
+    X : slice of input data of shape (f, f, n_C_prev)
+    W : Weight parameters contained in a window - matrix of shape (f, f, n_C_prev)
+    b : Bias parameters contained in a window - matrix of shape (1, 1, 1)
+    stride: the step size
+    Returns:
+    -------
+    res : a np.ndarray, result of convolving the sliding window (W, b) on a slice x of the input data
+    """
+    len = W.shape[0]
+    outh = np.flooer( ( X.shape[0] - W.shape[0] + 1 ) / stride )
+    outw = np.flooer( ( X.shape[1] - W.shape[1] + 1 ) / stride )
+    res = np.zeros((outh,outw))
+    for h in range(0,outh):
+        for w in range(0,outw):
+            res[h,w] = np.sum( X[h:h+len,w:w+len] * W )
+
+    return res
