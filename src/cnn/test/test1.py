@@ -54,6 +54,21 @@ def test_pool():
     print("average mode: ")
     print(A)
 
+def test_conv_back():
+    np.random.seed(1)
+    A_prev = np.random.randn(10,4,4,3)
+    W = np.random.randn(2,2,3,8)
+    b = np.random.randn(1,1,1,8)
+    hyperparams = {"conv_pad" : 2, "conv_stride": 1}
+    Z = conv(A_prev, W, b, hyperparams)
+    cache = (A_prev, W, b, hyperparams)
+
+    dA, dW, db = conv_backward(Z, cache)
+    print("dA_mean =", np.mean(dA))
+    print("dW_mean =", np.mean(dW))
+    print("db_mean =", np.mean(db))
+
 if __name__ == '__main__':
     #test_conv()
-    test_pool()
+    #test_pool()
+    test_conv_back()

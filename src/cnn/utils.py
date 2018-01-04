@@ -126,3 +126,78 @@ def pool_forward(A_prev, hyperparams):
     #cache = (A_prev, hyperparams)
 
     return res
+
+def conv_backward(dZ, cache):
+    """
+    Implement the backward propagation for a convolution function
+
+    Parameters
+    ----------
+    dZ : gradient of the cost with respect to the output of the conv layer (Z), numpy array of shape (m, outh, outw, outc)
+    cache -- cache of values needed for the conv_backward(), output of conv_forward()
+
+    Returns:
+    ----------
+    dA_prev : gradient of the cost with respect to the input of the conv layer (A_prev),
+               numpy array of shape (m, inh, inw, inc)
+    dW : gradient of the cost with respect to the weights of the conv layer (W)
+          numpy array of shape (filter_size, filter_size, inc, outc)
+    db : gradient of the cost with respect to the biases of the conv layer (b)
+          numpy array of shape (1, 1, 1, outc)
+    """
+
+    # Retrieve information from "cache"
+    (A_prev, W, b, hyperparams) = cache
+
+    # Retrieve dimensions from A_prev's shape
+    (m, inh, inw, inc) = A_prev.shape
+
+    # Retrieve dimensions from W's shape
+    (filter_size, filter_size, inc, outc) = W.shape
+
+    # Retrieve information from "hyperparams"
+    stride = hyperparams['conv_stride']
+    pad = hyperparams['conv_pad']
+
+    # Retrieve dimensions from dZ's shape
+    (m, outh, outw, outc) = dZ.shape
+
+    # Initialize dA_prev, dW, db with the correct shapes
+    dA_prev = np.zeros((m, inh, inw, inc))
+    dW = np.zeros((filter_size, filter_size, inc, outc))
+    db = np.zeros((1, 1, 1, outc))
+
+    # Pad A_prev and dA_prev
+    A_prev_pad = zero_pad(A_prev, pad)
+    dA_prev_pad = zero_pad(dA_prev, pad)
+
+    # loop over the training examples
+    for i in range(m):
+        # select ith training example from A_prev_pad and dA_prev_pad
+        a_prev_pad = A_prev_pad[i]
+        da_prev_pad = dA_prev_pad[i]
+        # loop on the vertical axis of the output volume
+        for h in range(outh):
+            # loop on the horizontal axis of the output volume
+            for w in range(outw):
+                # loop over the channels of the output volume
+                for c in range (outc):
+                    # Find the corners of the current "slice"
+                    starth = h * stride
+                    endh = starth + filter_size
+                    startw = w * stride
+                    endw = startw + filter_size
+                    # Use the corners to define the slice from a_prev_pad
+                    a_slice = a_prev_pad[starth:endh, startw:endw]
+                    # Update gradients for the window and the filter's parameters using the code formulas given above
+                    da_prev_pad[starth:endh, startw:endw] += W[:,:,:,c] * dZ[i, h, w, c]
+                    dW[:,:,:,c] += a_slice * dZ[i, h, w, c]
+                    db[:,:,:,c] += dZ[i, h, w, c]
+
+        # Set the ith training example's dA_prev to the unpaded da_prev_pad (Hint: use X[pad:-pad, pad:-pad, :])
+        dA_prev[i, :, :, :] = dA_prev_pad[i, pad:-pad, pad:-pad, :]
+
+    # Making sure your output shape is correct
+    assert(dA_prev.shape == (m, inh, inw, inc))
+
+    return dA_prev, dW, db
