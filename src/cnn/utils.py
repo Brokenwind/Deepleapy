@@ -187,17 +187,97 @@ def conv_backward(dZ, cache):
                     endh = starth + filter_size
                     startw = w * stride
                     endw = startw + filter_size
-                    # Use the corners to define the slice from a_prev_pad
-                    a_slice = a_prev_pad[starth:endh, startw:endw]
                     # Update gradients for the window and the filter's parameters using the code formulas given above
                     da_prev_pad[starth:endh, startw:endw] += W[:,:,:,c] * dZ[i, h, w, c]
+                    a_slice = a_prev_pad[starth:endh, startw:endw]
                     dW[:,:,:,c] += a_slice * dZ[i, h, w, c]
                     db[:,:,:,c] += dZ[i, h, w, c]
 
-        # Set the ith training example's dA_prev to the unpaded da_prev_pad (Hint: use X[pad:-pad, pad:-pad, :])
-        dA_prev[i, :, :, :] = dA_prev_pad[i, pad:-pad, pad:-pad, :]
+        dA_prev[i, :, :, :] = dA_prev_pad[i, pad:-pad, pad:-pad]
 
     # Making sure your output shape is correct
     assert(dA_prev.shape == (m, inh, inw, inc))
 
     return dA_prev, dW, db
+
+def distribute_value(dz, shape):
+    """
+    Distributes the input value in the matrix of dimension shape
+
+    Parameters:
+    ----------
+    dz : input scalar
+    shape : the shape (outh, outw) of the output matrix for which we want to distribute the value of dz
+
+    Returns:
+    ----------
+    a : Array of size (outh, outw) for which we distributed the value of dz
+    """
+
+    # Retrieve dimensions from shape
+    (outh, outw) = shape
+
+    # Compute the value to distribute on the matrix
+    average = dz / (outh * outw)
+
+    # Create a matrix where every entry is the "average" value
+    a = np.ones(shape) * average
+
+    return a
+
+def pool_backward(dA_out, cache):
+    """
+    Implements the backward pass of the pooling layer
+
+    Parameters:
+    dA_out : gradient of cost with respect to the output of the pooling layer, same shape as A_out
+    cache : cache output from the forward pass of the pooling layer, contains the layer's input and hyperparams
+    mode : the pooling mode you would like to use, defined as a string ("max" or "average")
+
+    Returns:
+    dA_in : gradient of cost with respect to the input of the pooling layer, same shape as A_in
+    """
+
+    (A_in, hyperparams) = cache
+    stride = hyperparams['pool_stride']
+    mode = hyperparams['pool_mode']
+    filter_size = hyperparams['pool_filter_size']
+
+    # Retrieve dimensions from A_in's shape and dA_out's shape
+    m, inh, inw, inc = A_in.shape
+    m, outh, outw, outc = dA_out.shape
+
+    # Initialize dA_in with zeros
+    dA_in = np.zeros_like(A_in)
+
+    for i in range(m):
+        # select training example from A_in
+        a_prev = A_in[i]
+        for h in range(outh):
+            for w in range(outw):
+                for c in range(outc):
+                    # Find the corners of the current "slice"
+                    starth = h * stride
+                    endh = starth + filter_size
+                    startw = w * stride
+                    endw = startw + filter_size
+                    # Compute the backward propagation in both modes.
+                    if mode == "max":
+                        # Use the corners and "c" to define the current slice from a_prev
+                        a_prev_slice = a_prev[starth:endh, startw:endw, c]
+                        # Create the mask from a_prev_slice
+                        mask = a_prev_slice == (np.max(a_prev_slice))
+                        # Set dA_in to be dA_in + (the mask multiplied by the correct entry of dA_out)
+                        dA_in[i, starth: endh, startw: endw, c] += mask * dA_out[i, starth, startw, c]
+                    elif mode == "average":
+                        # Get the value a from dA_out
+                        da = dA_out[i, starth, startw, c]
+                        # Define the shape of the filter as fxf
+                        shape = (filter_size, filter_size)
+                        # Distribute it to get the correct slice of dA_in. i.e. Add the distributed value of da.
+                        dA_in[i, starth: endh, startw: endw, c] += distribute_value(da, shape)
+
+    # Making sure your output shape is correct
+    assert(dA_in.shape == A_in.shape)
+
+    return dA_in

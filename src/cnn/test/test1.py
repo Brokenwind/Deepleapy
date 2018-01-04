@@ -55,6 +55,12 @@ def test_pool():
     print(A)
 
 def test_conv_back():
+    """
+    expected values:
+    dA_mean = 9.60899067587
+    dW_mean = 10.5817412755
+    db_mean = 76.3710691956
+    """
     np.random.seed(1)
     A_prev = np.random.randn(10,4,4,3)
     W = np.random.randn(2,2,3,8)
@@ -68,7 +74,48 @@ def test_conv_back():
     print("dW_mean =", np.mean(dW))
     print("db_mean =", np.mean(db))
 
+def test_pool_back():
+    """
+    expected results:
+
+    mode = max
+    mean of dA =  0.145713902729
+    dA_prev[1,1] = 
+    [[ 0.          0.        ]
+    [ 5.05844394 -1.68282702]
+    [ 0.          0.        ]]
+
+    mode = average
+    mean of dA =  0.145713902729
+    dA_prev[1,1] = 
+    [[ 0.08485462  0.2787552 ]
+    [ 1.26461098 -0.25749373]
+    [ 1.17975636 -0.53624893]]
+    """
+    np.random.seed(1)
+    A_prev = np.random.randn(5, 5, 3, 2)
+    hyperparams = {"pool_stride" : 1, "pool_filter_size": 2, "pool_mode":"max"}
+    cache = (A_prev, hyperparams)
+    A = pool_forward(A_prev, hyperparams)
+    dA = np.random.randn(5, 4, 2, 2)
+
+    hyperparams["pool_mode"] = "max"
+    dA_prev = pool_backward(dA, cache)
+    print("mode = max")
+    print('mean of dA = ', np.mean(dA))
+    print('dA_prev[1,1] = ')
+    print(dA_prev[1,1])
+    print()
+
+    hyperparams["pool_mode"] = "average"
+    dA_prev = pool_backward(dA, cache)
+    print("mode = average")
+    print('mean of dA = ', np.mean(dA))
+    print('dA_prev[1,1] = ')
+    print(dA_prev[1,1])
+
 if __name__ == '__main__':
     #test_conv()
     #test_pool()
-    test_conv_back()
+    #test_conv_back()
+    test_pool_back()
