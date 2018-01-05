@@ -1,0 +1,6 @@
+This is a collection of 6 signs representing numbers from 0 to 5, and it contains the following datas:
+  X:         (1080, 64, 64, 3)		1080 pictures for trainning a sign recognizer
+  y:         (1, 1080)   		the correct lables of the 1080 pictures, the values range from 0-5
+  Xtest:     (120, 64, 64, 3)     	120 pictures for testing the sign recognizer
+  ytest:     (120,)               	the correct lables of the 120 pictures, the values range from 0-5
+  classes:   (6,)                	array([0, 1, 2, 3, 4, 5])
