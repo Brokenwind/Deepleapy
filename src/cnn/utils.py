@@ -24,7 +24,7 @@ def zero_pad(X,pad):
 
     return X
 
-def conv(X,W,b,hyperparams):
+def conv_forward(X,W,b,hyperparams):
     """
     Implements the forward propagation for a convolution function
     Parameters
@@ -77,12 +77,12 @@ def pool_forward(A_prev, hyperparams):
         must containing the following parameters:
         pool_filter_size : int, the size of pool filter
         pool_stride : int, the stride of pool
-        mode : string ("max" or "average"), the pooling mode you would like to use
+        pool_mode : string ("max" or "average"), the pooling mode you would like to use
 
     Returns:
     ----------
     A : a numpy array of shape (m, n_H, n_W, n_C)
-        output of the pool layer 
+        output of the pool layer
     cache : cache used in the backward pass of the pooling layer, contains the input and hyperparams
     """
 
@@ -116,7 +116,6 @@ def pool_forward(A_prev, hyperparams):
                     endh = starth + filter_size
                     startw = w * stride
                     endw = startw + filter_size
-                    # Compute the pooling operation on the slice. Use an if statment to differentiate the modes. Use np.max/np.mean.
                     if mode == "max":
                         res[i, h, w, c] = np.max(sample[starth:endh, startw:endw, c])
                     elif mode == "average":
@@ -126,6 +125,33 @@ def pool_forward(A_prev, hyperparams):
     #cache = (A_prev, hyperparams)
 
     return res
+
+def fc_middle_forward(A, W, b, hyperparams):
+    """
+    Full connected layer forward propagation
+    """
+    # activation function
+    activation = hyperparams['activation']
+    Z = np.dot(W, A) + b
+    if activation == 'relu':
+        A = relu(Z)
+    elif activation == 'sigmoid':
+        A = sigmoid(Z)
+    else:
+        raise ValueError('No such activation: %s' % (activation))
+    return A, Z
+
+def fc_out_forward(A, W, b, hyperparams):
+    out_activation = hyperparams['out_activation']
+    Z = np.dot(W, A) + b
+    if out_activation == 'softmax':
+        A = softmax(Z)
+    elif out_activation == 'sigmoid':
+        A = sigmoid(Z)
+    else:
+        raise ValueError('No such out activation: %s' % (activation))
+
+    return A, Z
 
 def conv_backward(dZ, cache):
     """
@@ -175,7 +201,6 @@ def conv_backward(dZ, cache):
     for i in range(m):
         # select ith training example from A_prev_pad and dA_prev_pad
         a_prev_pad = A_prev_pad[i]
-        da_prev_pad = dA_prev_pad[i]
         # loop on the vertical axis of the output volume
         for h in range(outh):
             # loop on the horizontal axis of the output volume
@@ -187,12 +212,12 @@ def conv_backward(dZ, cache):
                     endh = starth + filter_size
                     startw = w * stride
                     endw = startw + filter_size
-                    # Update gradients for the window and the filter's parameters using the code formulas given above
-                    da_prev_pad[starth:endh, startw:endw] += W[:,:,:,c] * dZ[i, h, w, c]
+                    # Update gradients with the selected window and the filter's parameters
+                    dA_prev_pad[i, starth:endh, startw:endw] += W[:,:,:,c] * dZ[i, h, w, c]
                     a_slice = a_prev_pad[starth:endh, startw:endw]
                     dW[:,:,:,c] += a_slice * dZ[i, h, w, c]
                     db[:,:,:,c] += dZ[i, h, w, c]
-
+        # remove padding section
         dA_prev[i, :, :, :] = dA_prev_pad[i, pad:-pad, pad:-pad]
 
     # Making sure your output shape is correct
@@ -281,3 +306,14 @@ def pool_backward(dA_out, cache):
     assert(dA_in.shape == A_in.shape)
 
     return dA_in
+
+def fc_out_backward(dZ, cache):
+    """
+    dZ : the gradient of output value
+    """
+    (A_in, W) = cache
+    dW = 1./m * np.dot(dZ, A.T)
+    db = 1./m * np.sum(dZ, axis=1, keepdims = True)
+    dA_in = np.dot(W.T, dZ)
+
+    return dA_in, dW, db
