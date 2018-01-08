@@ -1,5 +1,10 @@
+import sys
+sys.path.append('..')
 import re
+import os
+import json
 import numpy as np
+from activation import *
 
 def zero_pad(X,pad):
     """
@@ -16,42 +21,32 @@ def zero_pad(X,pad):
     -------
         padded image of shape (m, n_H + 2*pad, n_W + 2*pad, n_C)
     """
+    if not isinstance(pad,tuple) and not isinstance(pad,list):
+        raise ValueError('pad should be a tuple or list')
     if X.ndim == 2:
-        X = np.pad(X, ((pad, pad),(pad, pad)), 'constant',constant_values=(0,0))
+        X = np.pad(X, ((pad[0], pad[0]),(pad[1], pad[1])), 'constant',constant_values=(0,0))
     if X.ndim == 3:
-        X = np.pad(X, ((pad, pad),(pad, pad),(0,0)), 'constant',constant_values=(0,0))
+        X = np.pad(X, ((pad[0], pad[0]),(pad[1], pad[1]),(0,0)), 'constant',constant_values=(0,0))
     if X.ndim == 4:
-        X = np.pad(X, ((0,0),(pad, pad),(pad, pad),(0,0)), 'constant',constant_values=(0,0))
+        X = np.pad(X, ((0,0),(pad[0], pad[0]),(pad[1], pad[1]),(0,0)), 'constant',constant_values=(0,0))
 
     return X
 
-def fc_middle_forward(A_in, W, b, hyperparams):
+def fc_forward(A_in, W, b, hyperparams):
     """
     Full connected layer forward propagation
     """
     # activation function
-    activation = hyperparams['activation']
+    activation = hyperparams['fc_activation']
     Z = np.dot(W, A_in) + b
     if activation == 'relu':
         A_out = relu(Z)
     elif activation == 'sigmoid':
         A_out = sigmoid(Z)
+    elif activation == 'softmax':
+        A_out = softmax(Z)
     else:
         raise ValueError('No such activation: %s' % (activation))
-
-    cache = (Z, A_in, W, b, hyperparams)
-
-    return A_out, cache
-
-def fc_out_forward(A_in, W, b, hyperparams):
-    out_activation = hyperparams['out_activation']
-    Z = np.dot(W, A_in) + b
-    if out_activation == 'softmax':
-        A_out = softmax(Z)
-    elif out_activation == 'sigmoid':
-        A_out = sigmoid(Z)
-    else:
-        raise ValueError('No such out activation: %s' % (activation))
 
     cache = (Z, A_in, W, b, hyperparams)
 
@@ -88,10 +83,10 @@ def conv_forward(A_in,W,b,hyperparams):
     """
     pad=hyperparams['conv_pad']
     stride=hyperparams['conv_stride']
-    filter_size = W.shape[0]
+    filter_size = hyperparams['conv_filter_size']
     m = A_in.shape[0]
-    outh = 1 + int( ( A_in.shape[1] - filter_size + 2*pad ) / stride )
-    outw = 1 + int( ( A_in.shape[2] - filter_size + 2*pad ) / stride )
+    outh = 1 + int( ( A_in.shape[1] - filter_size[0] + 2*pad[0] ) / stride[1] )
+    outw = 1 + int( ( A_in.shape[2] - filter_size[0] + 2*pad[1] ) / stride[1] )
     outl = W.shape[3]
     # pad A_in with zeros
     A_in = zero_pad(A_in, pad)
@@ -102,10 +97,10 @@ def conv_forward(A_in,W,b,hyperparams):
         for h in range(outh):
             for w in range(outw):
                 for l in range(outl):
-                    starth = h * stride
-                    endh = starth + filter_size
-                    startw = w * stride
-                    endw = startw + filter_size
+                    starth = h * stride[0]
+                    endh = starth + filter_size[0]
+                    startw = w * stride[1]
+                    endw = startw + filter_size[1]
                     Z[i,h,w,l] = np.sum( sample[starth:endh,startw:endw] * W[:,:,:,l] + b[:,:,:,l])
 
     cache = (Z, A_in, W, b, hyperparams)
@@ -169,10 +164,10 @@ def conv_backward(dZ, cache):
                 # loop over the channels of the output volume
                 for c in range (outc):
                     # Find the corners of the current "slice"
-                    starth = h * stride
-                    endh = starth + filter_size
-                    startw = w * stride
-                    endw = startw + filter_size
+                    starth = h * stride[0]
+                    endh = starth + filter_size[0]
+                    startw = w * stride[1]
+                    endw = startw + filter_size[1]
                     # Update gradients with the selected window and the filter's parameters
                     dA_in_pad[i, starth:endh, startw:endw] += W[:,:,:,c] * dZ[i, h, w, c]
                     a_slice = a_prev_pad[starth:endh, startw:endw]
@@ -242,8 +237,8 @@ def pool_forward(A_in, hyperparams):
     mode = hyperparams["pool_mode"]
 
     # Define the dimensions of the output
-    outh = int(1 + (inh - filter_size) / stride)
-    outw = int(1 + (inw - filter_size) / stride)
+    outh = int(1 + (inh - filter_size[0]) / stride[0])
+    outw = int(1 + (inw - filter_size[1]) / stride[1])
     outc = inc
 
     # Initialize output matrix A
@@ -259,10 +254,10 @@ def pool_forward(A_in, hyperparams):
                 # loop over the channels of the output volume
                 for c in range (outc):
                     # Find the corners of the current "slice" (≈4 lines)
-                    starth = h * stride
-                    endh = starth + filter_size
-                    startw = w * stride
-                    endw = startw + filter_size
+                    starth = h * stride[0]
+                    endh = starth + filter_size[0]
+                    startw = w * stride[1]
+                    endw = startw + filter_size[1]
                     if mode == "max":
                         Z[i, h, w, c] = np.max(sample[starth:endh, startw:endw, c])
                     elif mode == "average":
@@ -306,10 +301,10 @@ def pool_backward(dA_out, cache):
             for w in range(outw):
                 for c in range(outc):
                     # Find the corners of the current "slice"
-                    starth = h * stride
-                    endh = starth + filter_size
-                    startw = w * stride
-                    endw = startw + filter_size
+                    starth = h * stride[0]
+                    endh = starth + filter_size[0]
+                    startw = w * stride[1]
+                    endw = startw + filter_size[1]
                     # Compute the backward propagation in both modes.
                     if mode == "max":
                         # Use the corners and "c" to define the current slice from a_prev
@@ -332,12 +327,14 @@ def pool_backward(dA_out, cache):
     return dA_in
 
 def load_config_layers():
-    file_name = 'layers.json'
+    root = os.getcwd().split('src')[0]
+    file_name = root+'/src/cnn/layers.json'
     if not os.path.exists(file_name):
+        print(os.getcwd())
         raise IOError('The configuration file layers.json is not existed!!')
-    layers = json.load(open('layers.json'))
-    if not check_layers(layers):
-        raise ValueError('The values in configuration file layers.json are not correct!')
+    layers = json.load(open(file_name))
+    check_layers(layers)
+
     return layers
 
 def check_layers(layers):
@@ -346,13 +343,9 @@ def check_layers(layers):
     p=re.compile(r'(\w+)(\d+)')
     res = np.array( re.findall( p, str(keys) ) )
     names = res[:,0]
-    digits = res[:,1]
-    digits = digits.astype('int')
-    if np.unique(names).size != 1:
-        print('The spell of "layer" is not correct!')
-        return False
-    if np.sum(digits == np.arange(1,num+1)) != num:
-        print('Your layer number is not continuous!')
-        return False
+    digits = res[:,1].astype('int')
 
-    return True
+    if np.unique(names).size != 1:
+        raise ValueError('The spell of "layer" is not correct!')
+    if np.sum(digits == np.arange(0,num)) != num:
+        raise ValueError('Your layer number is not continuous!')
