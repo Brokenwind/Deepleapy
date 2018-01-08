@@ -1,0 +1,48 @@
+{
+    "layer0":
+    {
+        "layer_type": "data"
+    },
+    "layer1":
+    {
+        "layer_type": "conv",
+        "conv_channels": [3, 8],
+        "conv_filter_size": [4, 4],
+        "conv_pad": [0, 0],
+        "conv_stride": [1, 1]
+    },
+    "layer2":
+    {
+        "layer_type": "pool",
+        "pool_filter_size": [8, 8],
+        "pool_stride": [8, 8],
+        "pool_mode": "max"
+    },
+    "layer3":
+    {
+        "layer_type": "conv",
+        "conv_channels": [8, 16],
+        "conv_pad": [0, 0],
+        "conv_filter_size": [2, 2],
+        "conv_stride": [1, 1]
+    },
+    "layer4":
+    {
+        "layer_type": "pool",
+        "pool_filter_size": [4, 4],
+        "pool_stride": [4, 4],
+        "pool_mode": "max"
+    },
+    "layer5":
+    {
+        "layer_type": "fc",
+        "fc_units": [16, 8],
+        "fc_activation": "relu"
+    },
+    "layer6":
+    {
+        "layer_type": "fc",
+        "fc_units": [8, 6],
+        "fc_activation": "softmax"
+    }
+}
