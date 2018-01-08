@@ -22,7 +22,7 @@ def test_conv():
     print(np.mean(W))
     print(np.mean(b))
     hyperparams = {"conv_pad" : 2, "conv_stride": 2}
-    Z = conv(A_prev, W, b, hyperparams)
+    Z,cache = conv_forward(A_prev, W, b, hyperparams)
     print(Z.shape)
     print("Z's mean = ", np.mean(Z))
     print("Z[3,2,1] =", Z[3,2,1])
@@ -45,12 +45,12 @@ def test_pool():
     hyperparams = {"pool_stride" : 1, "pool_filter_size": 4}
 
     hyperparams['pool_mode'] = 'max'
-    A = pool_forward(A_prev, hyperparams)
+    A, cache = pool_forward(A_prev, hyperparams)
     print("max mode:")
     print(A)
 
     hyperparams['pool_mode'] = 'average'
-    A = pool_forward(A_prev, hyperparams)
+    A, cache = pool_forward(A_prev, hyperparams)
     print("average mode: ")
     print(A)
 
@@ -66,8 +66,7 @@ def test_conv_back():
     W = np.random.randn(2,2,3,8)
     b = np.random.randn(1,1,1,8)
     hyperparams = {"conv_pad" : 2, "conv_stride": 1}
-    Z = conv(A_prev, W, b, hyperparams)
-    cache = (A_prev, W, b, hyperparams)
+    Z, cache = conv_forward(A_prev, W, b, hyperparams)
 
     dA, dW, db = conv_backward(Z, cache)
     print("dA_mean =", np.mean(dA))
@@ -95,8 +94,7 @@ def test_pool_back():
     np.random.seed(1)
     A_prev = np.random.randn(5, 5, 3, 2)
     hyperparams = {"pool_stride" : 1, "pool_filter_size": 2, "pool_mode":"max"}
-    cache = (A_prev, hyperparams)
-    A = pool_forward(A_prev, hyperparams)
+    A, cache = pool_forward(A_prev, hyperparams)
     dA = np.random.randn(5, 4, 2, 2)
 
     hyperparams["pool_mode"] = "max"
@@ -115,7 +113,7 @@ def test_pool_back():
     print(dA_prev[1,1])
 
 if __name__ == '__main__':
-    #test_conv()
-    #test_pool()
-    #test_conv_back()
+    test_conv()
+    test_pool()
+    test_conv_back()
     test_pool_back()
