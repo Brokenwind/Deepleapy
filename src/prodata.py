@@ -1,6 +1,15 @@
 import numpy as np
 import re
+import json
 from numpy.linalg import norm
+
+def xavier_init(shape):
+    fan_in = shape[0]
+    fan_out = shape[1]
+    low = -1. * np.sqrt(6.0 / (fan_in + fan_out))
+    high = 1. * np.sqrt(6.0 / (fan_in + fan_out))
+
+    return np.random.uniform( low,high,size=shape )
 
 def init_empty(row, col):
     """
@@ -81,6 +90,42 @@ def init_params(units):
         params[1,l] = np.zeros((units[l], 1))
 
     return params
+
+def init_cnn_params(layers):
+    """
+    Arguments:
+    layers -- python array (list) containing the dimensions of each layer in our network
+
+    Returns:
+    parameters --
+    """
+    L = len(layers)
+    params = init_empty(2,L)
+    keys = sorted(layers.keys())
+    for l in range(0, L):
+        layer = layers[keys[l]]
+        if layer['layer_type'] == 'conv':
+            channels = layer['conv_channels']
+            filter_size = layer['conv_filter_size']
+            shape = [filter_size[0], filter_size[1], channels[0], channels[1]]
+            W = xavier_init(shape)
+            b = xavier_init([1,1,1,channels[1]])
+            params[0,l] = W
+            params[1,l] = b
+        elif layer['layer_type'] == 'pool':
+            # no parameters in pooling layer
+            params[0,l] = None
+            params[1,l] = None
+        elif layer['layer_type'] == 'fc':
+            fc_units = layer['fc_units']
+            fc_units.reverse()
+            W = xavier_init(fc_units)
+            b = xavier_init([fc_units[0],1])
+            params[0,l] = W
+            params[1,l] = b
+        l += 1
+    return params
+
 
 def normalize(x,axis=0):
     """
@@ -206,3 +251,7 @@ def train_test_split(X, y, **options):
     test_num = int(y.shape[1] * 0.25)
 
     return X[:,test_num:], y[:,test_num:], X[:,0:test_num], y[:,0:test_num]
+
+if __name__ == '__main__':
+    res = xavier_init([4,4,3,8])
+    print(res.shape)
