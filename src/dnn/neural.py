@@ -269,7 +269,7 @@ class OriginNeuralNetwork(Classifier):
             A = cache[1,l-1]
             # calculate dZ in different condition
             if l == self.layers-1 :
-                dZ = Al - y
+                dZ = 1./m * (Al - y)
             else:
                 if activation == 'relu':
                     # np.int64(A > 0) is the gradient of ReLU
@@ -280,8 +280,8 @@ class OriginNeuralNetwork(Classifier):
                 else:
                     raise ValueError('No such activation: %s' % (activation))
             # calculate dW, db, dA(left layer) with calculated dZ
-            dW = 1./m * np.dot(dZ, A.T)
-            db = 1./m * np.sum(dZ, axis=1, keepdims = True)
+            dW = np.dot(dZ, A.T)
+            db = np.sum(dZ, axis=1, keepdims = True)
             dA = np.dot(W.T, dZ)
 
             # add regularition item
