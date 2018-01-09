@@ -120,7 +120,7 @@ def init_cnn_params(layers):
             fc_units = layer['fc_units']
             fc_units.reverse()
             W = xavier_init(fc_units)
-            b = xavier_init([fc_units[0],1])
+            b = xavier_init([1, fc_units[0]])
             params[0,l] = W
             params[1,l] = b
         l += 1
@@ -131,38 +131,19 @@ def normalize(x,axis=0):
     """
     returns a normalized version of X where the mean value of each feature is 0 and the standard deviation is 1. This is often a good preprocessing step to do when working with learning algorithms.
     """
-    mean = np.mean(x,axis)
-    std = np.std(x,axis)
-
+    mean = np.mean(x,axis,keepdims=True)
+    std = np.std(x,axis,keepdims=True)
+    """
     if axis == 1:
         mean = mean.reshape((mean.size,1))
         std = std.reshape((std.size,1))
     else:
         mean = mean.reshape((1,mean.size))
         std = std.reshape((1,std.size))
-
+    """
     norm = (x - mean)/std
 
     return norm,mean,std
-
-def extract(params,prefix):
-    """
-    extract values from a dict when the key has the same given prefix
-    """
-    pattern = re.compile(prefix)
-    keys = params.keys()
-
-    sels = []
-    for key in keys:
-        if pattern.match(key):
-            sels.append(key)
-    sels.sort()
-
-    res = {}
-    for key in sels:
-        res[key] = params[key]
-
-    return res
 
 def normdiff(grad1, grad2):
     """
@@ -211,6 +192,7 @@ def train_test_split(X, y, **options):
     ----------
     X : np.ndarray shape (n_features, n_samples)
     y : np.ndarray shape (n_classes, n_samples)/(n_samples,)/(1,n_samples)
+    axis: which axis means the samples
     test_size : float, int, None, optional
         If float, should be between 0.0 and 1.0 and represent the proportion
         of the dataset to include in the test split.If None, the value is set
@@ -227,30 +209,38 @@ def train_test_split(X, y, **options):
     """
     if X is None or y is None:
         raise ValueError("Input data is None")
-    X = np.array(X)
-    y = np.array(y)
-    if y.ndim == 1:
-        y = y.reshape((1,y.size))
-    if X.shape[1] != y.shape[1]:
-        raise ValueError("X and y don't have the same number of samples")
+
     test_size = options.pop('test_size', None)
     shuffle = options.pop('shuffle', True)
+    axis = options.pop('axis', 0)
 
+    if y.ndim == 1:
+        if axis == 1:
+            y = y.reshape((1,y.size))
+        else:
+            y = y.reshape((y.size,1))
+    if X.shape[axis] != y.shape[axis]:
+        raise ValueError("X and y don't have the same number of samples")
     if options:
         raise TypeError("Invalid parameters passed: %s" % str(options))
-
     if test_size is None:
         test_size = 0.25
 
     # shuffle the data
     if shuffle:
-        perm = np.random.permutation(y.shape[1])
-        X = X[:,perm]
-        y = y[:,perm]
+        perm = np.random.permutation(y.shape[axis])
+        if axis == 1:
+            X = X[:,perm]
+            y = y[:,perm]
+        else:
+            X = X[perm]
+            y = y[perm]
 
-    test_num = int(y.shape[1] * 0.25)
-
-    return X[:,test_num:], y[:,test_num:], X[:,0:test_num], y[:,0:test_num]
+    test_num = int(y.shape[axis] * 0.25)
+    if axis == 1:
+        return X[:,test_num:], y[:,test_num:], X[:,0:test_num], y[:,0:test_num]
+    else:
+        return X[test_num:], y[test_num:], X[0:test_num], y[0:test_num]
 
 if __name__ == '__main__':
     res = xavier_init([4,4,3,8])
