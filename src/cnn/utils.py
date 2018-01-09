@@ -32,13 +32,13 @@ def zero_pad(X,pad):
 
     return X
 
-def fc_forward(A_in, W, b, hyperparams):
+def fc_forward(A_in, W, b, layer):
     """
     Full connected layer forward propagation
     """
     # activation function
-    activation = hyperparams['fc_activation']
-    Z = np.dot(W, A_in) + b
+    activation = layer['activation']
+    Z = np.dot(A_in, W.T) + b
     if activation == 'relu':
         A_out = relu(Z)
     elif activation == 'sigmoid':
@@ -47,8 +47,8 @@ def fc_forward(A_in, W, b, hyperparams):
         A_out = softmax(Z)
     else:
         raise ValueError('No such activation: %s' % (activation))
-
-    cache = (Z, A_in, W, b, hyperparams)
+    layer['shape'] = A_out.shape
+    cache = (Z, A_in, W, b, layer)
 
     return A_out, cache
 
@@ -56,15 +56,15 @@ def fc_backward(dZ, cache):
     """
     dZ : the gradient of output value
     """
-    (Z, A_in, W, b, hyperparams) = cache
-    dW = np.dot(dZ, A_in.T)
-    db = np.sum(dZ, axis=1, keepdims = True)
-    dA_in = np.dot(W.T, dZ)
+    (Z, A_in, W, b, layer) = cache
+    dW = np.dot(dZ.T, A_in)
+    db = np.sum(dZ, axis=0, keepdims = True)
+    dA_in = np.dot(dZ, W)
 
     return dA_in, dW, db
 
 
-def conv_forward(A_in,W,b,hyperparams):
+def conv_forward(A_in,W,b,layer):
     """
     Implements the forward propagation for a convolution function
     Parameters
@@ -81,9 +81,9 @@ def conv_forward(A_in,W,b,hyperparams):
     Z : conv output, numpy array of shape (m, n_H, n_W, n_C)
     cache -- cache of values needed for the conv_backward() function
     """
-    pad=hyperparams['conv_pad']
-    stride=hyperparams['conv_stride']
-    filter_size = hyperparams['conv_filter_size']
+    pad=layer['conv_pad']
+    stride=layer['conv_stride']
+    filter_size = layer['conv_filter_size']
     m = A_in.shape[0]
     outh = 1 + int( ( A_in.shape[1] - filter_size[0] + 2*pad[0] ) / stride[1] )
     outw = 1 + int( ( A_in.shape[2] - filter_size[0] + 2*pad[1] ) / stride[1] )
@@ -103,8 +103,9 @@ def conv_forward(A_in,W,b,hyperparams):
                     endw = startw + filter_size[1]
                     Z[i,h,w,l] = np.sum( sample[starth:endh,startw:endw] * W[:,:,:,l] + b[:,:,:,l])
 
-    cache = (Z, A_in, W, b, hyperparams)
     A_out = Z
+    layer['shape'] = A_out.shape
+    cache = (Z, A_in, W, b, layer)
 
     return A_out, cache
 
@@ -129,7 +130,7 @@ def conv_backward(dZ, cache):
     """
 
     # Retrieve information from "cache"
-    (Z, A_in, W, b, hyperparams) = cache
+    (Z, A_in, W, b, layer) = cache
 
     # Retrieve dimensions from A_in's shape
     (m, inh, inw, inc) = A_in.shape
@@ -137,9 +138,9 @@ def conv_backward(dZ, cache):
     # Retrieve dimensions from W's shape
     (filter_size, filter_size, inc, outc) = W.shape
 
-    # Retrieve information from "hyperparams"
-    stride = hyperparams['conv_stride']
-    pad = hyperparams['conv_pad']
+    # Retrieve information from "layer"
+    stride = layer['conv_stride']
+    pad = layer['conv_pad']
 
     # Retrieve dimensions from dZ's shape
     (m, outh, outw, outc) = dZ.shape
@@ -207,7 +208,7 @@ def distribute_value(dz, shape):
     return a
 
 
-def pool_forward(A_in, hyperparams):
+def pool_forward(A_in, W, b, layer):
     """
     Implements the forward pass of the pooling layer
 
@@ -215,7 +216,7 @@ def pool_forward(A_in, hyperparams):
     ----------
     A_in : numpy array of shape (m, n_H_prev, n_W_prev, n_C_prev)
         Input data, m samples
-    hyperparams : python dictionary
+    layer : python dictionary
         must containing the following parameters:
         pool_filter_size : int, the size of pool filter
         pool_stride : int, the stride of pool
@@ -225,16 +226,16 @@ def pool_forward(A_in, hyperparams):
     ----------
     A : a numpy array of shape (m, n_H, n_W, n_C)
         output of the pool layer
-    cache : cache used in the backward pass of the pooling layer, contains the input and hyperparams
+    cache : cache used in the backward pass of the pooling layer, contains the input and layer
     """
 
     # Retrieve dimensions from the input shape
     (m, inh, inw, inc) = A_in.shape
 
-    # Retrieve hyperparameters from "hyperparams"
-    filter_size = hyperparams["pool_filter_size"]
-    stride = hyperparams["pool_stride"]
-    mode = hyperparams["pool_mode"]
+    # Retrieve hyperparameters from "layer"
+    filter_size = layer["pool_filter_size"]
+    stride = layer["pool_stride"]
+    mode = layer["pool_mode"]
 
     # Define the dimensions of the output
     outh = int(1 + (inh - filter_size[0]) / stride[0])
@@ -263,9 +264,10 @@ def pool_forward(A_in, hyperparams):
                     elif mode == "average":
                         Z[i, h, w, c] = np.mean(sample[starth:endh, startw:endw, c])
 
-    # Store the input and hyperparams in "cache" for pool_backward()
-    cache = (Z, A_in, hyperparams)
+    # Store the input and layer in "cache" for pool_backward()
     A_out = Z
+    layer['shape'] = A_out.shape
+    cache = (Z, A_in, W, b, layer)
     return A_out, cache
 
 
@@ -275,17 +277,17 @@ def pool_backward(dA_out, cache):
 
     Parameters:
     dA_out : gradient of cost with respect to the output of the pooling layer, same shape as A_out
-    cache : cache output from the forward pass of the pooling layer, contains the layer's input and hyperparams
+    cache : cache output from the forward pass of the pooling layer, contains the layer's input and layer
     mode : the pooling mode you would like to use, defined as a string ("max" or "average")
 
     Returns:
     dA_in : gradient of cost with respect to the input of the pooling layer, same shape as A_in
     """
 
-    (Z, A_in, hyperparams) = cache
-    stride = hyperparams['pool_stride']
-    mode = hyperparams['pool_mode']
-    filter_size = hyperparams['pool_filter_size']
+    (Z, A_in, W, b, layer) = cache
+    stride = layer['pool_stride']
+    mode = layer['pool_mode']
+    filter_size = layer['pool_filter_size']
 
     # Retrieve dimensions from A_in's shape and dA_out's shape
     m, inh, inw, inc = A_in.shape
