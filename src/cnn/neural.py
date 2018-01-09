@@ -9,7 +9,7 @@ from activation import *
 from datamap import *
 from prodata import *
 from utils import *
-from loss import compute_cost
+from loss import compute_cnn_cost
 from base import Classifier
 
 
@@ -112,7 +112,7 @@ class LeNet5(Classifier):
     def __init__(self, model_type='classification',solver='BGD',
                  lossfunc='log_loss',activation="relu",out_activation='sigmoid',
                  learning_rate_type='constant',learning_rate_init=0.01,
-                 L2_penalty=0.01,max_iters=200, batch_size=64, tol=1e-4,
+                 L2_penalty=0.,max_iters=200, batch_size=64, tol=1e-4,
                  verbose=False, no_improve_num=10, early_stopping=False,
                  momentum_beta=0.9, rms_beta=0.99, epsilon=1e-8,
                  conv_filter_size=5, conv_pad=0, conv_stride=1,
@@ -181,7 +181,7 @@ class LeNet5(Classifier):
         """Forward propatation of neural network
         Parameters
         ----------
-        X : np.ndarray (features, samples)
+        X : np.ndarray (samples, features)
             the input of test data
         params : python dictionary (if it is not set, the function will use self.params instead)
             python dictionary containing your parameters "Wl", "bl"(l means the lth layer)
@@ -201,14 +201,11 @@ class LeNet5(Classifier):
             W = self.params[0, l]
             b = self.params[1, l]
             if layer['layer_type'] == 'conv':
-                A_out, cache = conv_forward(A_in,W,b,layer)
+                A_out, cache = conv_forward(A_in, W, b, layer)
             if layer['layer_type'] == 'pool':
-                A_out, cache = pool_forward(A_in, layer)
+                A_out, cache = pool_forward(A_in, W, b, layer)
             if layer['layer_type'] == 'fc':
                 A_in = A_in.reshape(A_in.shape[0], -1)
-                if first_fc:
-                    A_in = A_in.T
-                    first_fc = False
                 A_out, cache = fc_forward(A_in, W, b, layer)
             caches.append(cache)
             # the output of this layer is the next layer's input
@@ -233,9 +230,9 @@ class LeNet5(Classifier):
         Backward propagation of neural network
         Parameters
         ----------
-        X : np.ndarray (features, samples)
+        X : np.ndarray (samples, features)
             the input of test data
-        y : np.ndarray (classes, samples)
+        y : np.ndarray (samples, classes)
             the output of test data
         params : python dictionary (if it is not set, the function will use self.params instead)
             python dictionary containing your parameters "Wl", "bl"(l means the lth layer) 
@@ -246,36 +243,54 @@ class LeNet5(Classifier):
         """
         if params is not None:
             self.params = params
-        Al,cache = self.forward(X)
-        cost = compute_cost(self.params,self.hyperparams,y,Al)
-        m = X.shape[1]
+        m, n = y.shape
+        A_out, caches = self.forward(X)
         # activation function
-        activation = self.hyperparams['activation']
-        out_activation = self.hyperparams['out_activation']
         L2_penalty = self.hyperparams['L2_penalty']
-        gradients = init_empty(2,self.fc_layers)
-        for l in range(self.fc_layers-1,0,-1):
-            Z = cache[0,l]
-            W = self.params[0,l]
-            A_pre = cache[1,l-1]
-            if l == self.fc_layers-1 :
-                dZ = Al - y
-            else:
+        gradients = init_empty(2,len(self.layers))
+        #cost = compute_cnn_cost(self.hyperparams,y,A_out)
+
+        keys = sorted(self.layers.keys())
+        last_layer = True
+        for l in range(len(self.layers)-2, 0,-1):
+            Z, A_in, W, b, layer = caches[l]
+            if last_layer:
+                dZ = A_out - y
+                last_layer = False
+            elif 'activation' in layer.keys():
+                activation = layer['activation']
                 if activation == 'relu':
                     # np.int64(A > 0) is the gradient of ReLU
-                    dZ = dA * np.int64(Z > 0)
+                    dZ = dA_in * np.int64(Z > 0)
                 elif activation == 'sigmoid':
                     gZ = sigmoid(Z)
-                    dZ = dA * gZ * (1-gZ)
+                    dZ = dA_in * gZ * (1-gZ)
                 else:
                     raise ValueError('No such activation: %s' % (activation))
-            # add regularition item
-            dW += 1.0*L2_penalty/m * self.params[0,l]
+
+            if layer['layer_type'] == 'conv':
+                dZ = dZ.reshape(layer['shape'])
+                dA_in, dW, db = conv_backward(dZ, caches[l])
+                # add regularition item
+                dW += 1.0*L2_penalty/m * W
+                print('conv')
+            if layer['layer_type'] == 'pool':
+                print(dZ.shape)
+                dZ = dZ.reshape(layer['shape'])
+                dA_in, dW, db = pool_backward(dZ, caches[l])
+                print('pool')
+            if layer['layer_type'] == 'fc':
+                print(dZ.shape)
+                dZ = dZ.reshape(layer['shape'])
+                dA_in, dW, db = fc_backward(dZ, caches[l])
+                # add regularition item
+                dW += 1.0*L2_penalty/m * W
+                print('fc')
 
             gradients[0,l] = dW
             gradients[1,l] = db
 
-        return gradients, cost
+        return gradients
 
     def update_no_improve_count(self, X_val=None, y_val=None):
         if self.hyperparams['early_stopping']:
