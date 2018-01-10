@@ -193,6 +193,7 @@ class LeNet5(Classifier):
         if params is not None:
             self.params = params
         caches = []
+        caches.append(None)
         A_in = X
         first_fc = True
         keys = sorted(self.layers.keys())
@@ -243,20 +244,20 @@ class LeNet5(Classifier):
         """
         if params is not None:
             self.params = params
+        layer_num = len(self.layers)
         m, n = y.shape
         A_out, caches = self.forward(X)
         # activation function
         L2_penalty = self.hyperparams['L2_penalty']
         gradients = init_empty(2,len(self.layers))
         #cost = compute_cnn_cost(self.hyperparams,y,A_out)
-
         keys = sorted(self.layers.keys())
-        last_layer = True
-        for l in range(len(self.layers)-2, 0,-1):
+        for l in range(layer_num - 1, 0, -1):
             Z, A_in, W, b, layer = caches[l]
-            if last_layer:
+
+            # the last layer
+            if l == layer_num - 1:
                 dZ = A_out - y
-                last_layer = False
             elif 'activation' in layer.keys():
                 activation = layer['activation']
                 if activation == 'relu':
@@ -267,6 +268,9 @@ class LeNet5(Classifier):
                     dZ = dA_in * gZ * (1-gZ)
                 else:
                     raise ValueError('No such activation: %s' % (activation))
+            else:
+                # if there is no activation function
+                dZ = dA_in
 
             if layer['layer_type'] == 'conv':
                 dZ = dZ.reshape(layer['shape'])
@@ -275,12 +279,10 @@ class LeNet5(Classifier):
                 dW += 1.0*L2_penalty/m * W
                 print('conv')
             if layer['layer_type'] == 'pool':
-                print(dZ.shape)
                 dZ = dZ.reshape(layer['shape'])
                 dA_in, dW, db = pool_backward(dZ, caches[l])
                 print('pool')
             if layer['layer_type'] == 'fc':
-                print(dZ.shape)
                 dZ = dZ.reshape(layer['shape'])
                 dA_in, dW, db = fc_backward(dZ, caches[l])
                 # add regularition item

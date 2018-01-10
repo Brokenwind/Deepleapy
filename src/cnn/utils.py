@@ -1,5 +1,6 @@
 import sys
-sys.path.append('..')
+sys.path.append('../')
+sys.path.append('../../')
 import re
 import os
 import json
@@ -89,11 +90,11 @@ def conv_forward(A_in,W,b,layer):
     outw = 1 + int( ( A_in.shape[2] - filter_size[0] + 2*pad[1] ) / stride[1] )
     outl = W.shape[3]
     # pad A_in with zeros
-    A_in = zero_pad(A_in, pad)
+    A_in_pad = zero_pad(A_in, pad)
     # the number of output layers
     Z = np.zeros((m,outh,outw,outl))
     for i in range(m):
-        sample = A_in[i]
+        sample = A_in_pad[i]
         for h in range(outh):
             for w in range(outw):
                 for l in range(outl):
@@ -136,18 +137,18 @@ def conv_backward(dZ, cache):
     (m, inh, inw, inc) = A_in.shape
 
     # Retrieve dimensions from W's shape
-    (filter_size, filter_size, inc, outc) = W.shape
+    #(filter_size, filter_size, inc, outc) = W.shape
 
     # Retrieve information from "layer"
     stride = layer['conv_stride']
     pad = layer['conv_pad']
-
+    filter_size = layer['conv_filter_size']
     # Retrieve dimensions from dZ's shape
     (m, outh, outw, outc) = dZ.shape
 
     # Initialize dA_in, dW, db with the correct shapes
     dA_in = np.zeros((m, inh, inw, inc))
-    dW = np.zeros((filter_size, filter_size, inc, outc))
+    dW = np.zeros((filter_size[0], filter_size[1], inc, outc))
     db = np.zeros((1, 1, 1, outc))
 
     # Pad A_in and dA_in
@@ -156,8 +157,6 @@ def conv_backward(dZ, cache):
 
     # loop over the training examples
     for i in range(m):
-        # select ith training example from A_in_pad and dA_in_pad
-        a_prev_pad = A_in_pad[i]
         # loop on the vertical axis of the output volume
         for h in range(outh):
             # loop on the horizontal axis of the output volume
@@ -171,11 +170,11 @@ def conv_backward(dZ, cache):
                     endw = startw + filter_size[1]
                     # Update gradients with the selected window and the filter's parameters
                     dA_in_pad[i, starth:endh, startw:endw] += W[:,:,:,c] * dZ[i, h, w, c]
-                    a_slice = a_prev_pad[starth:endh, startw:endw]
+                    a_slice = A_in_pad[i, starth:endh, startw:endw]
                     dW[:,:,:,c] += a_slice * dZ[i, h, w, c]
                     db[:,:,:,c] += dZ[i, h, w, c]
         # remove padding section
-        dA_in[i, :, :, :] = dA_in_pad[i, pad:-pad, pad:-pad]
+        dA_in[i, :, :, :] = dA_in_pad[i, pad[0]:inh+pad[0], pad[1]:inw+pad[1]]
 
     # Making sure your output shape is correct
     assert(dA_in.shape == (m, inh, inw, inc))
@@ -314,19 +313,17 @@ def pool_backward(dA_out, cache):
                         # Create the mask from a_prev_slice
                         mask = a_prev_slice == (np.max(a_prev_slice))
                         # Set dA_in to be dA_in + (the mask multiplied by the correct entry of dA_out)
-                        dA_in[i, starth: endh, startw: endw, c] += mask * dA_out[i, starth, startw, c]
+                        dA_in[i, starth: endh, startw: endw, c] += mask * dA_out[i, h, w, c]
                     elif mode == "average":
                         # Get the value a from dA_out
                         da = dA_out[i, starth, startw, c]
-                        # Define the shape of the filter as fxf
-                        shape = (filter_size, filter_size)
                         # Distribute it to get the correct slice of dA_in. i.e. Add the distributed value of da.
-                        dA_in[i, starth: endh, startw: endw, c] += distribute_value(da, shape)
+                        dA_in[i, starth: endh, startw: endw, c] += distribute_value(da, filter_size)
 
     # Making sure your output shape is correct
     assert(dA_in.shape == A_in.shape)
 
-    return dA_in
+    return dA_in, None, None
 
 def load_config_layers():
     root = os.getcwd().split('src')[0]

@@ -11,15 +11,15 @@ def load_data():
     Xtest = data['Xtest']
     ytest = data['ytest']
     classes = data['classes']
-    y = y.reshape((1,y.size))
-    ytest = ytest.reshape((1,ytest.size))
-    print(X.shape)
+
     return X, y, Xtest, ytest, classes
 
 if __name__ == '__main__':
     net = LeNet5()
     net.algorithm_init()
     X, y, Xtest, ytest, classes = load_data()
+    map = DataMap(classes)
+    Y = map.index2matrix(y)
+    Y = Y.T
     res, caches = net.forward(X[0:2])
-    print(res)
-    print(y[0,0:2])
+    net.backward(X[0:2],Y[0:2])
