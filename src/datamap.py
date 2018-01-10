@@ -109,8 +109,9 @@ class DataMap:
         res : 2D np.ndarray (classes,samples)
             a 2D array of transformed matrix
         """
+        idx = np.array(idx)
+        idx = idx.flatten()
         if self.class_num == 2:
-            idx = np.array(idx)
             idx = idx.reshape((1,idx.size))
             if len(np.unique(idx)) != 2:
                 raise ValueError('The number of different idx is not consistent with the number of different class name')

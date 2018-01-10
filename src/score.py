@@ -51,7 +51,7 @@ def accuracy_score(y_true, y_pred, normalize=True):
 
     return score
 
-def r2_score(y_true, y_pred):
+def r2_score(y_true, y_pred, axis=0):
     """R^2 (coefficient of determination) regression score function.
     Best possible score is 1.0 and it can be negative (because the
     model can be arbitrarily worse). A constant model that always
@@ -80,12 +80,17 @@ def r2_score(y_true, y_pred):
             <https://baike.baidu.com/item/%E5%8F%AF%E5%86%B3%E7%B3%BB%E6%95%B0/8020809?fr=aladdin&fromid=18081717&fromtitle=coefficient+of+determination>`_
     """
     if y_true.ndim == 1:
-        y_true = y_true.reshape((1,y_true.size))
-        y_pred = y_pred.reshape((1,y_pred.size))
+        if axis == 1:
+            y_true = y_true.reshape((1,y_true.size))
+            y_pred = y_pred.reshape((1,y_pred.size))
+            # simplify the calculation
+            y_true = y_true.T
+            y_pred = y_pred.T
+        else:
+            y_true = y_true.reshape((y_true.size, 1))
+            y_pred = y_pred.reshape((y_pred.size, 1))
+
     check_consistent_length(y_true, y_pred)
-    # simplify the calculation
-    y_true = y_true.T
-    y_pred = y_pred.T
     numerator = ( (y_true - y_pred) ** 2).sum(axis=0, dtype=np.float64)
     denominator = ((y_true - np.average(y_true, axis=0)) ** 2).sum(axis=0, dtype=np.float64 )
     nonzero_denominator = denominator != 0
@@ -102,7 +107,7 @@ def r2_score(y_true, y_pred):
 
 if __name__ == '__main__':
     print(accuracy_score(np.array([[0, 1], [1, 1]]), np.ones((2, 2))))
-    print(accuracy_score(np.array([0, 1]), np.ones((1, 2))))
+    #print(accuracy_score(np.array([0, 1]), np.ones((1, 2))))
     y_true = np.array([3, -0.5, 2, 7])
     y_pred = np.array([2.5, 0.0, 2, 8])
     print (r2_score(y_true, y_pred))

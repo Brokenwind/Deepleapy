@@ -388,7 +388,7 @@ class OriginNeuralNetwork(Classifier):
         X_test = None
         y_test = None
         if self.hyperparams['early_stopping']:
-            X, y, X_test, y_test = train_test_split(X,y)
+            X, y, X_test, y_test = train_test_split(X,y, axis=1)
         num = X.shape[1]
         batch_size = self.hyperparams['batch_size']
         learning_rate_init = self.hyperparams['learning_rate_init']
@@ -427,7 +427,7 @@ class OriginNeuralNetwork(Classifier):
         X_test = None
         y_test = None
         if self.hyperparams['early_stopping']:
-            X, y, X_test, y_test = train_test_split(X,y)
+            X, y, X_test, y_test = train_test_split(X,y,axis=1)
         num = X.shape[1]
         batch_size = self.hyperparams['batch_size']
         learning_rate_init = self.hyperparams['learning_rate_init']
@@ -465,7 +465,7 @@ class OriginNeuralNetwork(Classifier):
         X_test = None
         y_test = None
         if self.hyperparams['early_stopping']:
-            X, y, X_test, y_test = train_test_split(X,y)
+            X, y, X_test, y_test = train_test_split(X,y,axis=1)
         num = X.shape[1]
         batch_size = self.hyperparams['batch_size']
         learning_rate_init = self.hyperparams['learning_rate_init']
@@ -501,7 +501,7 @@ class OriginNeuralNetwork(Classifier):
         X_test = None
         y_test = None
         if self.hyperparams['early_stopping']:
-            X, y, X_test, y_test = train_test_split(X,y)
+            X, y, X_test, y_test = train_test_split(X,y,axis=1)
         num = X.shape[1]
         batch_size = self.hyperparams['batch_size']
         learning_rate_init = self.hyperparams['learning_rate_init']
@@ -537,7 +537,7 @@ class OriginNeuralNetwork(Classifier):
         X_test = None
         y_test = None
         if self.hyperparams['early_stopping']:
-            X, y, X_test, y_test = train_test_split(X,y)
+            X, y, X_test, y_test = train_test_split(X,y,axis=1)
         num = X.shape[1]
         batch_size = self.hyperparams['batch_size']
         learning_rate_init = self.hyperparams['learning_rate_init']
