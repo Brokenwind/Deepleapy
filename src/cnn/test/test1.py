@@ -112,6 +112,14 @@ def test_pool_back():
     print('dA_prev[1,1] = ')
     print(dA_prev[1,1])
 
+def test_cost():
+    np.random.seed(1)
+    X = np.random.randn(4,64,64,3)
+    Y = np.random.randn(4,6)
+    Z3=[[-0.44670227, -1.57208765, -1.53049231, -2.31013036, -1.29104376, 0.46852064],[-0.17601591, -1.57972014, -1.4737016, -2.61672091, -1.00810647, 0.5747785 ]]
+    res, caches = net.forward(X)
+    grads, cost = net.backward(X,Y)
+
 if __name__ == '__main__':
     test_conv()
     test_pool()

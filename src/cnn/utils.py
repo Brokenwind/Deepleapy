@@ -48,6 +48,7 @@ def fc_forward(A_in, W, b, layer):
         A_out = softmax(Z)
     else:
         raise ValueError('No such activation: %s' % (activation))
+
     layer['shape'] = A_out.shape
     cache = (Z, A_in, W, b, layer)
 
@@ -266,7 +267,7 @@ def pool_forward(A_in, W, b, layer):
     # Store the input and layer in "cache" for pool_backward()
     A_out = Z
     layer['shape'] = A_out.shape
-    cache = (Z, A_in, W, b, layer)
+    cache = (Z, A_in, np.array([]), np.array([]), layer)
     return A_out, cache
 
 
@@ -323,11 +324,11 @@ def pool_backward(dA_out, cache):
     # Making sure your output shape is correct
     assert(dA_in.shape == A_in.shape)
 
-    return dA_in, None, None
+    return dA_in, np.array([]), np.array([])
 
-def load_config_layers():
+def load_config_layers(config_file_name='layers.json'):
     root = os.getcwd().split('src')[0]
-    file_name = root+'/src/cnn/layers.json'
+    file_name = root+'/src/cnn/'+config_file_name
     if not os.path.exists(file_name):
         print(os.getcwd())
         raise IOError('The configuration file layers.json is not existed!!')

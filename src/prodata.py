@@ -99,11 +99,11 @@ def init_cnn_params(layers):
     Returns:
     parameters --
     """
+    np.random.seed(1)
     L = len(layers)
     params = init_empty(2,L)
-    keys = sorted(layers.keys())
-    for l in range(0, L):
-        layer = layers[keys[l]]
+    for l in range(1, L):
+        layer = layers['layer'+str(l)]
         if layer['layer_type'] == 'conv':
             channels = layer['conv_channels']
             filter_size = layer['conv_filter_size']
@@ -161,6 +161,9 @@ def normdiff(grad1, grad2):
             flat2 = np.hstack((flat2,grad2[i,l].flatten()))
 
         diff[i] = norm(flat1 - flat2)/norm(flat1 + flat2)
+        for i in range(0, flat1.size):
+            if ( abs(flat1[i] - flat2[i]) < 1e-2 ):
+                print("%f\t\t%f" % (flat1[i],flat2[i]))
 
     return diff
 

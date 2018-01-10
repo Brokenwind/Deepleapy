@@ -121,15 +121,14 @@ def compute_cnn_cost(hyperparams, y_true, y_prob):
     # the regularition parameter
     L2_penalty = hyperparams['L2_penalty']
     loss = hyperparams['lossfunc']
-    L = len(units)
+    #L = len(units)
 
     # n: the number of class
     # m: the number row of result
-    n,m = y_prob.shape
-
+    m,n = y_prob.shape
     lossfunc = LOSS_FUNCTIONS[loss]
 
-    J = lossfunc(y_true,y_prob,axis=1)
+    J = lossfunc(y_true,y_prob,axis=0)
     """
     regular = 0
     for l in range(1,L):

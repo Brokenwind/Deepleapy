@@ -110,8 +110,8 @@ class LeNet5(Classifier):
     # it is the instance of DataMap, which will tranform between names of classes and its indexes
 
     def __init__(self, model_type='classification',solver='BGD',
-                 lossfunc='log_loss',activation="relu",out_activation='sigmoid',
-                 learning_rate_type='constant',learning_rate_init=0.01,
+                 lossfunc='softmax_loss',learning_rate_type='constant',
+                 learning_rate_init=0.01,
                  L2_penalty=0.,max_iters=200, batch_size=64, tol=1e-4,
                  verbose=False, no_improve_num=10, early_stopping=False,
                  momentum_beta=0.9, rms_beta=0.99, epsilon=1e-8,
@@ -139,7 +139,9 @@ class LeNet5(Classifier):
         self.hyperparams['pool_filter_size'] = pool_filter_size
         self.hyperparams['pool_stride'] = pool_stride
         self.hyperparams['pool_mode'] = pool_mode
+
         self.layers = load_config_layers()
+        self.hyperparams['layers'] = self.layers
 
     def get_hyperparams(self):
         """
@@ -175,7 +177,7 @@ class LeNet5(Classifier):
                 self.hyperparams[key] = hyperparams[key]
             else:
                 raise ValueError('The "%s" is not a hyperparam' % (key))
-        self.fc_layers = len(self.hyperparams['fc_units'])
+        self.layers = hyperparams['layers']
 
     def forward(self, X, params=None):
         """Forward propatation of neural network
@@ -250,14 +252,14 @@ class LeNet5(Classifier):
         # activation function
         L2_penalty = self.hyperparams['L2_penalty']
         gradients = init_empty(2,len(self.layers))
-        #cost = compute_cnn_cost(self.hyperparams,y,A_out)
+        cost = compute_cnn_cost(self.hyperparams,y,A_out)
         keys = sorted(self.layers.keys())
         for l in range(layer_num - 1, 0, -1):
             Z, A_in, W, b, layer = caches[l]
 
             # the last layer
             if l == layer_num - 1:
-                dZ = A_out - y
+                dZ = 1./m * (A_out - y)
             elif 'activation' in layer.keys():
                 activation = layer['activation']
                 if activation == 'relu':
@@ -292,7 +294,7 @@ class LeNet5(Classifier):
             gradients[0,l] = dW
             gradients[1,l] = db
 
-        return gradients
+        return gradients, cost
 
     def update_no_improve_count(self, X_val=None, y_val=None):
         if self.hyperparams['early_stopping']:
